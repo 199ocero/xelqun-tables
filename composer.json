@@ -1,0 +1,68 @@
+{
+    "name": "xelqun/tables",
+    "description": "PHP-defined, schema-driven tables for Laravel, Inertia and Vue.",
+    "keywords": [
+        "laravel",
+        "inertia",
+        "vue",
+        "tables",
+        "admin",
+        "xelqun"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jay-Are Ocero",
+            "email": "199ocero@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/http": "^13.0",
+        "illuminate/support": "^13.0",
+        "xelqun/forms": "^0.3"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.9",
+        "laravel/pint": "^1.27",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.3",
+        "pestphp/pest-plugin-laravel": "^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Xelqun\\Tables\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Xelqun\\Tables\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "lint": "pint",
+        "types:check": "phpstan analyse"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Xelqun\\Tables\\TablesServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

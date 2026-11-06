@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "strict": true,
+        "noUncheckedIndexedAccess": false,
+        "isolatedModules": true,
+        "verbatimModuleSyntax": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "jsx": "preserve",
+        "types": ["vite/client"],
+        "noEmit": true
+    },
+    "include": ["resources/js/**/*.ts", "resources/js/**/*.vue", "tests/js/**/*.ts"]
+}
