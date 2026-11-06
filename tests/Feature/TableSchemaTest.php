@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Xelqun\Tables\Columns\Column;
@@ -68,6 +69,46 @@ it('sends row keys as strings', function () {
     $product = Product::create(['name' => 'Keyboard']);
 
     expect(tableSchema()['rows'][0]['key'])->toBe((string) $product->id);
+});
+
+describe('recordUrl()', function () {
+    function linkedRow(string $url): array
+    {
+        Product::create(['name' => 'Keyboard', 'price' => 1]);
+
+        $table = new class extends ProductsTable
+        {
+            public static string $url = '';
+
+            public function recordUrl(Model $record): string
+            {
+                return self::$url;
+            }
+        };
+        $table::$url = $url;
+
+        return $table::make()->toSchema()['rows'][0];
+    }
+
+    it('sends where a row goes', function () {
+        expect(linkedRow('/products/1')['url'])->toBe('/products/1');
+    });
+
+    it('drops an unsafe link', function (string $url) {
+        expect(linkedRow($url))->not->toHaveKey('url');
+    })->with(['javascript:alert(1)', 'data:text/html,x', '//evil.example']);
+
+    it('adds nothing to a table without one', function () {
+        Product::create(['name' => 'Keyboard', 'price' => 1]);
+
+        expect(tableSchema()['rows'][0])->not->toHaveKey('url');
+    });
+});
+
+it('sends an empty state only when there is one', function () {
+    expect(ProductsTable::make()->toSchema())->not->toHaveKey('emptyState')
+        ->and(ProductsTable::make()->emptyState('No products', 'Add one.')->toSchema()['emptyState'])
+        ->toBe(['heading' => 'No products', 'description' => 'Add one.']);
 });
 
 it('refuses to render for someone it does not authorize', function () {

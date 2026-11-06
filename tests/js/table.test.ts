@@ -331,6 +331,64 @@ describe('XqTable', () => {
         expect(wrapper.text()).toContain('No records found.');
     });
 
+    it("shows the table's own empty state", () => {
+        const table = schema({
+            rows: [],
+            emptyState: { heading: 'No products', description: 'Add one.' },
+        });
+        const wrapper = mount(XqTable, { props: { table } });
+
+        expect(wrapper.text()).toContain('No products');
+        expect(wrapper.text()).toContain('Add one.');
+        expect(wrapper.text()).not.toContain('No records found.');
+    });
+
+    it("links every cell of a row, with a cell's own link winning", () => {
+        const table = schema({
+            columns: [
+                { name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} },
+                { name: 'site', type: 'text-column', label: 'Site', sortable: false, props: {} },
+            ],
+            rows: [
+                {
+                    key: '1',
+                    url: '/products/1',
+                    cells: { name: { state: 'Keyboard' }, site: { state: 'Shop', url: '/shop' } },
+                    actions: [],
+                },
+            ],
+        });
+        const wrapper = mount(XqTable, { props: { table } });
+        const links = wrapper.findAll('tbody a');
+
+        expect(links.map((link) => link.attributes('href'))).toEqual(['/products/1', '/shop']);
+        expect(links[0].classes()).toContain('block');
+        expect(links[1].classes()).toContain('hover:underline');
+    });
+
+    it("stops Tab on a row's link once", () => {
+        const table = schema({
+            columns: [
+                { name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} },
+                { name: 'price', type: 'text-column', label: 'Price', sortable: false, props: {} },
+            ],
+            rows: [
+                {
+                    key: '1',
+                    url: '/products/1',
+                    cells: { name: { state: 'Keyboard' }, price: { state: '$5' } },
+                    actions: [],
+                },
+            ],
+        });
+        const wrapper = mount(XqTable, { props: { table } });
+
+        expect(wrapper.findAll('tbody a').map((link) => link.attributes('tabindex'))).toEqual([
+            undefined,
+            '-1',
+        ]);
+    });
+
     it('shows text in the language the server sent', () => {
         const table = schema({ rows: [], messages: { 'No records found.': 'Sin registros.' } });
         const wrapper = mount(XqTable, { props: { table } });

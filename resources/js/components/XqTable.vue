@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
 import { cn, useRegistry, XqAction, XqActionGroup, XqButton, XqCheckbox } from '@xelqun/forms';
-import type { SchemaNode } from '@xelqun/forms';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, watch } from 'vue';
 import { createTableStore } from '../core/store';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
-import type { TableAction, TableQuery, TableSchema } from '../schema/types';
+import type { TableQuery, TableRow, TableSchema } from '../schema/types';
+import { actionNode } from './actionNode';
 import { builtInCells } from './cells';
 import XqCellLink from './XqCellLink.vue';
 import XqTableBulkBar from './XqTableBulkBar.vue';
@@ -43,16 +43,11 @@ const hasToolbar = computed(
         schema.value.headerActions.length > 0,
 );
 
-/** XqAction reads a form node, and an action's key is its name here. */
-function actionNode(action: TableAction): SchemaNode {
-    return {
-        key: action.name,
-        type: action.actions ? 'action-group' : 'action',
-        hidden: false,
-        props: action.props,
-        children: action.actions?.map(actionNode) ?? [],
-        deps: [],
-    };
+/** A row's link is in every cell, and Tab should only stop on it once. */
+function isRepeatedRowLink(row: TableRow, name: string): boolean {
+    const first = columns.value.find((column) => !row.cells[column.name].url);
+
+    return Boolean(row.url) && !row.cells[name].url && first?.name !== name;
 }
 
 function sortDirection(name: string): 'asc' | 'desc' | null {
@@ -227,7 +222,12 @@ onMounted(() => {
                     <tr
                         v-for="row in schema.rows"
                         :key="row.key"
-                        class="border-xq-border border-b last:border-b-0"
+                        :class="
+                            cn(
+                                'border-xq-border border-b last:border-b-0',
+                                row.url && 'hover:bg-xq-muted/50',
+                            )
+                        "
                     >
                         <td v-if="hasSelection" class="px-3 py-2">
                             <XqCheckbox
@@ -239,8 +239,10 @@ onMounted(() => {
                         <td v-for="column in columns" :key="column.name" class="px-3 py-2">
                             <XqCellLink
                                 v-if="column.cell"
-                                :url="row.cells[column.name].url"
-                                :new-tab="column.opensInNewTab"
+                                :url="row.cells[column.name].url ?? row.url"
+                                :new-tab="row.cells[column.name].url ? column.opensInNewTab : false"
+                                :quiet="!row.cells[column.name].url"
+                                :tabindex="isRepeatedRowLink(row, column.name) ? -1 : undefined"
                             >
                                 <component
                                     :is="column.cell"
@@ -273,7 +275,15 @@ onMounted(() => {
                             "
                             class="px-3 py-8 text-xq-muted-foreground text-center"
                         >
-                            {{ t('No records found.') }}
+                            <template v-if="schema.emptyState">
+                                <p class="font-medium text-xq-foreground">
+                                    {{ schema.emptyState.heading }}
+                                </p>
+                                <p v-if="schema.emptyState.description" class="mt-1">
+                                    {{ schema.emptyState.description }}
+                                </p>
+                            </template>
+                            <template v-else>{{ t('No records found.') }}</template>
                         </td>
                     </tr>
                 </tbody>

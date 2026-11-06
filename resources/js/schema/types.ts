@@ -25,6 +25,7 @@ export interface TableAction {
 
 export interface TableRow {
     key: string;
+    url?: string;
     cells: Record<string, TableCell>;
     actions: TableAction[];
 }
@@ -60,6 +61,7 @@ export interface TableSchema extends TableResult {
     headerActions: TableAction[];
     bulkActions: TableAction[];
     maxSelectable: number;
+    emptyState?: { heading: string; description: string | null };
     searchable: boolean;
     filters: FormSchema | null;
     filterDefaults: Record<string, unknown>;

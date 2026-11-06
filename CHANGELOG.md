@@ -2,6 +2,24 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## 0.4.0 - 2026-11-06
+
+This release needs `xelqun/forms` 0.6. The schema version (`$xq`) stays 1.
+
+### Upgrading
+
+Update both halves together: `composer update xelqun/tables xelqun/forms` and `npm install @xelqun/tables@0.4.0 @xelqun/forms@0.6.0`.
+
+### Added
+
+- **`recordUrl()`** makes a whole row a link. Override it on the table, and a cell's own link wins over it. An unsafe URL is dropped.
+- **`emptyState()`** sets the heading and description shown when there are no rows.
+- **`actionNode`** is exported, so a custom view of a table's rows can render its actions with `XqAction`.
+
+### Fixed
+
+- **An upload stays with its table when one class serves several.** The upload's scope now includes the table's id.
+
 ## 0.3.0 - 2026-11-06
 
 This release needs `xelqun/forms` 0.5. The schema version (`$xq`) stays 1.

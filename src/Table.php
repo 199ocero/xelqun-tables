@@ -12,6 +12,7 @@ use Xelqun\Actions\Action;
 use Xelqun\Actions\ActionGroup;
 use Xelqun\Forms\Security\FormToken;
 use Xelqun\Forms\Security\FormTokenEncrypter;
+use Xelqun\Forms\Support\SafeUrl;
 use Xelqun\Tables\Actions\BulkAction;
 use Xelqun\Tables\Actions\TableActionHost;
 use Xelqun\Tables\Columns\Column;
@@ -40,6 +41,9 @@ abstract class Table
     private ?string $defaultSort = null;
 
     private int $maxSelectableRecords = 1000;
+
+    /** @var array{heading: string, description: string|null}|null */
+    private ?array $emptyState = null;
 
     /** @var array<int, Column>|null */
     private ?array $mountedColumns = null;
@@ -308,6 +312,24 @@ abstract class Table
     }
 
     /**
+     * What to show when there are no rows, in place of "No records found."
+     */
+    public function emptyState(string $heading, ?string $description = null): static
+    {
+        $this->emptyState = ['heading' => $heading, 'description' => $description];
+
+        return $this;
+    }
+
+    /**
+     * Where clicking a row goes. A link of a cell's own wins over this.
+     */
+    public function recordUrl(Model $record): ?string
+    {
+        return null;
+    }
+
+    /**
      * The columns the viewer may see. A hidden one is left out of everything,
      * search and sorting included, so a viewer can't work out its values.
      *
@@ -366,6 +388,7 @@ abstract class Table
             'headerActions' => TableActionHost::for($this, TableActionHost::HEADER)->toActionNodes(),
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'maxSelectable' => $this->maxSelectableRecords,
+            ...($this->emptyState === null ? [] : ['emptyState' => $this->emptyState]),
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),
             ...$result,
@@ -396,6 +419,7 @@ abstract class Table
             'activeFilters' => count($this->getActiveFilters($state)),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
+                ...array_filter(['url' => SafeUrl::filter($this->recordUrl($record))]),
                 'cells' => collect($columns)
                     ->mapWithKeys(fn (Column $column): array => [$column->getName() => $column->toCell($record)])
                     ->all(),

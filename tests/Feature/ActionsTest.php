@@ -359,6 +359,22 @@ it('uploads from a modal, and the upload stays with that modal', function () {
     expect($record->refresh()->name)->toBe('With photo');
 });
 
+it('keeps an upload to its table when one class serves several', function () {
+    $record = live();
+    $this->withCredentials()->withCookie(config('session.cookie'), str_repeat('a', 40));
+
+    $upload = $this->post(route('xelqun.forms.upload'), [
+        'token' => modalToken(ActionsTable::make()->id('lax'), $record),
+        'path' => 'data.photo',
+        'file' => UploadedFile::fake()->image('a.png'),
+        'state' => json_encode(['data' => []]),
+    ], ['Accept' => 'application/json'])->assertOk()->json('token');
+
+    $this->runTableAction(ActionsTable::make()->id('strict'), 'rename', $record->id, ['photo' => $upload])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('data.photo');
+});
+
 it('keeps a table that shows trashed rows working in its modals', function () {
     $record = TrashableProduct::create(['name' => 'Gone']);
     $record->delete();

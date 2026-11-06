@@ -147,7 +147,8 @@ final class TableActionHost extends ActionSet
 
     public function getUploadScope(): string
     {
-        return parent::getUploadScope().'>'.$this->getTable()::class.'>'.$this->context['kind'];
+        // The id, because one generic table class can stand for several tables with different rules.
+        return parent::getUploadScope().'>'.$this->getTable()::class.'>'.$this->context['tableId'].'>'.$this->context['kind'];
     }
 
     private function getTable(): Table

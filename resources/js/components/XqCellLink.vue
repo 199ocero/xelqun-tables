@@ -2,7 +2,8 @@
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
-const props = defineProps<{ url?: string; newTab?: boolean }>();
+/** `quiet` is for a link the whole row shares, which the row's hover already shows. */
+const props = defineProps<{ url?: string; newTab?: boolean; quiet?: boolean }>();
 
 const tag = computed(() => {
     if (!props.url) {
@@ -29,7 +30,7 @@ const tag = computed(() => {
         :href="url"
         :target="url && newTab ? '_blank' : undefined"
         :rel="url && newTab ? 'noopener noreferrer' : undefined"
-        :class="url && 'hover:underline'"
+        :class="url && (quiet ? '-mx-3 -my-2 px-3 py-2 block' : 'hover:underline')"
     >
         <slot />
     </component>
