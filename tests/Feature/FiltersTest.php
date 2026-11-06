@@ -57,6 +57,26 @@ class FilteredTable extends Table
     }
 }
 
+class CodeFilterTable extends FilteredTable
+{
+    public function filters(): array
+    {
+        return [
+            Filter::make('code')
+                ->schema([TextInput::make('code')])
+                ->query(fn (Builder $query, array $data) => $query->where('name', $data['code'])),
+        ];
+    }
+}
+
+class LeadingZeroTable extends FilteredTable
+{
+    public function filters(): array
+    {
+        return [SelectFilter::make('status')->options(['0012' => 'Twelve', 'other' => 'Other'])];
+    }
+}
+
 class SwitchedOnTable extends FilteredTable
 {
     public function filters(): array
@@ -341,6 +361,39 @@ it('combines with search', function () {
     $this->queryTable(FilteredTable::make(), ['search' => 'key', 'filters' => ['status' => 'active']])
         ->assertJsonPath('pagination.total', 1)
         ->assertJsonPath('rows.0.cells.name.state', 'Keypad');
+});
+
+it('matches a url value to an option with an integer key', function () {
+    $category = Category::create(['name' => 'Input']);
+
+    Product::create(['name' => 'In', 'category_id' => $category->id, 'is_featured' => true]);
+
+    Route::get('/filtered', fn () => response()->json(FilteredTable::make()->toSchema()));
+
+    $response = $this->getJson("/filtered?filtered-table[filters][category]={$category->id}&filtered-table[filters][is_featured]=1&filtered-table[filters][kinds][0]=draft");
+
+    expect($response->json('filters.state.data.category'))->toBe($category->id)
+        ->and($response->json('filters.state.data.is_featured'))->toBe(1)
+        ->and($response->json('filters.state.data.kinds'))->toBe(['draft']);
+});
+
+it('keeps digits in a text field as text', function () {
+    Product::create(['name' => '123']);
+    Product::create(['name' => 'Other']);
+
+    $response = $this->queryTable(CodeFilterTable::make(), ['filters' => ['code' => '123']])->assertOk();
+
+    expect($response->json('rows'))->toHaveCount(1)
+        ->and($response->json('query.filters.code'))->toBe('123');
+});
+
+it('leaves a select value with leading zeros as text', function () {
+    Product::create(['name' => 'A', 'status' => '0012']);
+    Product::create(['name' => 'B', 'status' => 'other']);
+
+    $response = $this->queryTable(LeadingZeroTable::make(), ['filters' => ['status' => '0012']])->assertOk();
+
+    expect($response->json('rows'))->toHaveCount(1);
 });
 
 it('reads the first render from the url and fills the form', function () {

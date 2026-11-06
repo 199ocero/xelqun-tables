@@ -47,3 +47,43 @@ it('keeps what is already there unless told otherwise', function (): void {
     $this->artisan('make:xelqun-column', ['name' => 'Spark'])->assertFailed();
     $this->artisan('make:xelqun-column', ['name' => 'Spark', '--force' => true])->assertSuccessful();
 });
+
+it('creates a table for a model', function (): void {
+    $this->artisan('make:xelqun-table', ['name' => 'ProductsTable'])->assertSuccessful();
+
+    $source = File::get("{$this->appPath}/app/Tables/ProductsTable.php");
+
+    expect($source)->toContain('class ProductsTable extends Table')
+        ->and($source)->toContain('use App\\Models\\Product;')
+        ->and($source)->toContain('return Product::query();');
+});
+
+it('uses the model it is given', function (): void {
+    $this->artisan('make:xelqun-table', ['name' => 'Orders', '--model' => 'Invoice'])->assertSuccessful();
+
+    expect(File::get("{$this->appPath}/app/Tables/Orders.php"))->toContain('return Invoice::query();');
+});
+
+it('refuses a table name it can\'t use, and keeps what is there', function (): void {
+    $this->artisan('make:xelqun-table', ['name' => 'not-a-class'])->assertFailed();
+    $this->artisan('make:xelqun-table', ['name' => 'Products', '--model' => '../Evil'])->assertFailed();
+
+    $this->artisan('make:xelqun-table', ['name' => 'Products'])->assertSuccessful();
+    $this->artisan('make:xelqun-table', ['name' => 'Products'])->assertFailed();
+});
+
+it('imports the stylesheet right after tailwindcss', function (): void {
+    File::ensureDirectoryExists("{$this->appPath}/resources/css");
+    File::put("{$this->appPath}/resources/css/app.css", "@import 'tailwindcss';\n");
+
+    $this->artisan('xelqun-tables:install', ['--without-node' => true])->assertSuccessful();
+    $this->artisan('xelqun-tables:install', ['--without-node' => true])->assertSuccessful();
+
+    expect(File::get("{$this->appPath}/resources/css/app.css"))->toBe("@import 'tailwindcss';\n@import '@xelqun/tables/style.css';\n");
+});
+
+it('prints the step when it can\'t find the stylesheet', function (): void {
+    $this->artisan('xelqun-tables:install', ['--without-node' => true])
+        ->expectsOutputToContain('@xelqun/tables/style.css')
+        ->assertSuccessful();
+});

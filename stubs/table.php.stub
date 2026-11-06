@@ -1,0 +1,33 @@
+<?php
+
+namespace {{ namespace }};
+
+use {{ modelNamespace }}\{{ model }};
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
+use Xelqun\Tables\Columns\TextColumn;
+use Xelqun\Tables\Table;
+
+class {{ class }} extends Table
+{
+    /**
+     * This also runs on the table's own requests, where the page's route
+     * parameters are gone. Pass what it needs through make($context).
+     */
+    public function query(): Builder
+    {
+        return {{ model }}::query();
+    }
+
+    public function authorize(?Authenticatable $user): bool
+    {
+        return true;
+    }
+
+    public function columns(): array
+    {
+        return [
+            TextColumn::make('id')->sortable(),
+        ];
+    }
+}

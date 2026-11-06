@@ -3,6 +3,8 @@
 namespace Xelqun\Tables\State;
 
 use Illuminate\Support\Arr;
+use Xelqun\Forms\Components\Component;
+use Xelqun\Forms\Components\Select;
 use Xelqun\Forms\Support\StatePath;
 use Xelqun\Forms\Validation\FormValidator;
 use Xelqun\Tables\Table;
@@ -66,6 +68,12 @@ final class TableState
         $defaults = $table->getFilterDefaults();
         $posted = Arr::only(is_array($input) ? $input : [], array_keys($defaults));
         $posted = array_map(fn (mixed $value): mixed => $value === '' ? null : $value, $posted);
+
+        $form->walk(function (Component $component) use (&$posted): void {
+            if ($component instanceof Select && array_key_exists($component->getName(), $posted)) {
+                $posted[$component->getName()] = self::matchOptionKey($posted[$component->getName()]);
+            }
+        });
         $validator = app(FormValidator::class);
 
         $validator->prepare($form, [...$defaults, ...$posted]);
@@ -76,6 +84,21 @@ final class TableState
         }
 
         return Arr::only($form->getData(), array_keys($defaults));
+    }
+
+    /**
+     * The URL only holds text, and an option's value is an integer when PHP made
+     * its key one, so "1" would match nothing in a select. This is PHP's own rule
+     * for keys, which leaves "0012" alone. It's for selects only, because a text
+     * field's rules want text.
+     */
+    private static function matchOptionKey(mixed $value): mixed
+    {
+        return match (true) {
+            is_array($value) => array_map(self::matchOptionKey(...), $value),
+            is_string($value) && (string) (int) $value === $value => (int) $value,
+            default => $value,
+        };
     }
 
     public function withPage(int $page): self
