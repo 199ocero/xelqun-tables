@@ -29,6 +29,8 @@ abstract class Table
     /** @var array<int, int> */
     private array $paginationPageOptions = [10, 25, 50];
 
+    private ?string $defaultSort = null;
+
     /** @var array<int, Column>|null */
     private ?array $mountedColumns = null;
 
@@ -108,7 +110,34 @@ abstract class Table
     }
 
     /**
-     * The columns the viewer may see. A hidden one is left out of everything.
+     * The order before the viewer picks one. The column doesn't have to be
+     * sortable, or be one of the table's columns.
+     */
+    public function defaultSort(string $column, string $direction = 'asc'): static
+    {
+        $this->defaultSort = ($direction === 'desc' ? '-' : '').$column;
+
+        return $this;
+    }
+
+    public function getDefaultSort(): ?string
+    {
+        return $this->defaultSort;
+    }
+
+    public function isSearchable(): bool
+    {
+        return collect($this->getColumns())->contains(fn (Column $column): bool => $column->isSearchable());
+    }
+
+    public function findSortableColumn(string $name): ?Column
+    {
+        return collect($this->getColumns())->first(fn (Column $column): bool => $column->isSortable() && $column->getName() === $name);
+    }
+
+    /**
+     * The columns the viewer may see. A hidden one is left out of everything,
+     * search and sorting included, so a viewer can't work out its values.
      *
      * @return array<int, Column>
      */
@@ -126,6 +155,12 @@ abstract class Table
 
         if (count($names) !== count(array_unique($names))) {
             throw new TableDefinitionException('The table ['.static::class.'] has two columns with the same name. Cells are keyed by name, so one would overwrite the other.');
+        }
+
+        $model = $this->query()->getModel();
+
+        foreach ($columns as $column) {
+            $column->assertCanBeQueried($model);
         }
 
         return $this->mountedColumns = $columns;
@@ -149,6 +184,7 @@ abstract class Table
             'id' => $this->getId(),
             'token' => $this->makeToken(),
             'endpoints' => ['query' => route('xelqun.tables.query', absolute: false)],
+            'searchable' => $this->isSearchable(),
             ...$this->getClientMessages(),
             'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $this->getColumns()),
             ...$this->toResult(TableState::from(is_array($input) ? $input : [], $this)),
@@ -160,12 +196,12 @@ abstract class Table
      *
      * @internal
      *
-     * @return array{query: object, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
+     * @return array{query: object, sort: string|null, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
      */
     public function toResult(TableState $state): array
     {
         $columns = $this->getColumns();
-        $query = $this->query();
+        $query = $this->buildQuery($state);
         $total = $query->toBase()->getCountForPagination();
 
         // Counted first, because deleting the last row of the last page leaves the viewer past the end.
@@ -174,6 +210,7 @@ abstract class Table
 
         return [
             'query' => (object) $state->toQuery($this),
+            'sort' => $state->sort,
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
                 'cells' => collect($columns)
@@ -188,6 +225,47 @@ abstract class Table
                 'options' => $this->paginationPageOptions,
             ],
         ];
+    }
+
+    /**
+     * @return Builder<covariant Model>
+     */
+    private function buildQuery(TableState $state): Builder
+    {
+        $query = $this->query();
+        $model = $query->getModel();
+
+        $query->with(array_values(array_filter(
+            array_map(fn (Column $column): ?string => $column->getEagerLoad($model), $this->getColumns()),
+        )));
+
+        if ($state->search !== '') {
+            // A global scope, because a where added here would escape an orWhere in query().
+            $query->withGlobalScope('xelqun-search', fn (Builder $scoped): Builder => $scoped->where(function (Builder $group) use ($state): void {
+                foreach ($this->getColumns() as $column) {
+                    if ($column->isSearchable()) {
+                        $column->applySearch($group, $state->search);
+                    }
+                }
+            }));
+        }
+
+        if ($state->sort !== null) {
+            $name = ltrim($state->sort, '-');
+            $direction = str_starts_with($state->sort, '-') ? 'desc' : 'asc';
+            $column = $this->findSortableColumn($name);
+
+            $query->reorder();
+
+            if ($column === null) {
+                $query->orderBy($query->qualifyColumn($name), $direction);
+            } else {
+                $column->applySort($query, $direction);
+            }
+        }
+
+        // Rows with equal values have no order of their own, so they could repeat across pages.
+        return $query->orderBy($model->getQualifiedKeyName());
     }
 
     public function makeToken(): string

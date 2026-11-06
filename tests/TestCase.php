@@ -22,6 +22,7 @@ abstract class TestCase extends Orchestra
     {
         Schema::create('categories', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('parent_id')->nullable();
             $table->string('name');
         });
 

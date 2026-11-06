@@ -5,27 +5,32 @@
     "endpoints": {
         "query": "\/_xelqun\/tables\/query"
     },
+    "searchable": false,
     "columns": [
         {
             "name": "name",
             "type": "text-column",
             "label": "Name",
+            "sortable": false,
             "props": {}
         },
         {
             "name": "price",
             "type": "text-column",
             "label": "Cost",
+            "sortable": false,
             "props": {}
         },
         {
             "name": "shouted",
             "type": "text-column",
             "label": "Shouted",
+            "sortable": false,
             "props": {}
         }
     ],
     "query": {},
+    "sort": null,
     "rows": [
         {
             "key": "1",

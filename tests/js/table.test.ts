@@ -17,8 +17,10 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         id: 'products-table',
         token: 'token',
         endpoints: { query: '/query' },
+        searchable: false,
         query: {},
-        columns: [{ name: 'name', type: 'text-column', label: 'Name', props: {} }],
+        sort: null,
+        columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} }],
         rows: [{ key: '1', cells: { name: { state: 'Keyboard' } } }],
         pagination: { page: 1, perPage: 10, total: 1, lastPage: 1, options: [10] },
         ...overrides,
@@ -98,6 +100,103 @@ describe('XqTable', () => {
         const wrapper = mount(XqTable, { props: { table: renamed as TableSchema } });
 
         expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+
+    it('asks for ascending, then descending, on a sortable column', async () => {
+        const fetchMock = respondWith({
+            query: { sort: 'name' },
+            sort: 'name',
+            rows: [],
+            pagination: paged,
+        });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const table = schema({
+            pagination: { ...paged, page: 2 },
+            query: { page: 2 },
+            columns: [
+                { name: 'name', type: 'text-column', label: 'Name', sortable: true, props: {} },
+            ],
+        });
+
+        window.history.replaceState(null, '', '/products?products-table[page]=2');
+
+        const wrapper = mount(XqTable, { props: { table } });
+
+        await wrapper.find('th button').trigger('click');
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock)).query).toEqual({ page: 1, sort: 'name' });
+        expect(wrapper.find('th').attributes('aria-sort')).toBe('ascending');
+
+        await wrapper.find('th button').trigger('click');
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock, 1)).query.sort).toBe('-name');
+    });
+
+    it('waits for a pause in typing before it searches', async () => {
+        vi.useFakeTimers();
+
+        const fetchMock = respondWith({
+            query: { search: 'ke' },
+            sort: null,
+            rows: [],
+            pagination: paged,
+        });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table: schema({ searchable: true }) } });
+        const input = wrapper.find('input[type="search"]');
+
+        await input.setValue('k');
+        await vi.advanceTimersByTimeAsync(100);
+        await input.setValue('ke');
+        await vi.advanceTimersByTimeAsync(299);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(JSON.parse(sentBody(fetchMock)).query).toEqual({ search: 'ke', page: 1 });
+        vi.useRealTimers();
+    });
+
+    it('does not overwrite what is being typed with an older answer', async () => {
+        const wrapper = mount(XqTable, {
+            props: { table: schema({ searchable: true, query: { search: 'k' } }) },
+            attachTo: document.body,
+        });
+        const input = wrapper.find<HTMLInputElement>('input[type="search"]');
+
+        input.element.focus();
+        await input.setValue('ke');
+        await wrapper.setProps({
+            table: schema({ searchable: true, token: 'new', query: { search: 'k' } }),
+        });
+
+        expect(input.element.value).toBe('ke');
+        wrapper.unmount();
+    });
+
+    it('does not search after leaving the page', async () => {
+        vi.useFakeTimers();
+
+        const fetchMock = respondWith({});
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table: schema({ searchable: true }) } });
+
+        await wrapper.find('input[type="search"]').setValue('k');
+        wrapper.unmount();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        vi.useRealTimers();
     });
 
     it('turns off the buttons at the ends', () => {
@@ -227,7 +326,9 @@ describe('XqTable', () => {
             setup: (props) => () => h('b', `${props.cell?.state} stars`),
         });
         const table = schema({
-            columns: [{ name: 'rating', type: 'acme/stars', label: 'Rating', props: {} }],
+            columns: [
+                { name: 'rating', type: 'acme/stars', label: 'Rating', sortable: false, props: {} },
+            ],
             rows: [{ key: '1', cells: { rating: { state: 4 } } }],
         });
         const wrapper = mount(XqTable, {
@@ -246,7 +347,9 @@ describe('XqTable', () => {
 
     it('names a column type nothing renders', () => {
         const table = schema({
-            columns: [{ name: 'name', type: 'acme/missing', label: 'Name', props: {} }],
+            columns: [
+                { name: 'name', type: 'acme/missing', label: 'Name', sortable: false, props: {} },
+            ],
         });
         const wrapper = mount(XqTable, { props: { table } });
 

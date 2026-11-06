@@ -4,6 +4,7 @@ export interface TableColumn {
     name: string;
     type: string;
     label: string;
+    sortable: boolean;
     props: Record<string, any>;
 }
 
@@ -32,6 +33,8 @@ export type TableQuery = Record<string, any>;
 
 export interface TableResult {
     query: TableQuery;
+    /** A column's name, with a leading "-" for descending. */
+    sort: string | null;
     rows: TableRow[];
     pagination: TablePagination;
 }
@@ -42,6 +45,7 @@ export interface TableSchema extends TableResult {
     id: string;
     token: string;
     endpoints: { query: string };
+    searchable: boolean;
     messages?: Record<string, string>;
     columns: TableColumn[];
 }

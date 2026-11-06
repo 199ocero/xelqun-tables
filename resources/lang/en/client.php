@@ -13,6 +13,7 @@ return [
     'Per page' => 'Per page',
     'Previous page' => 'Previous page',
     'Retry' => 'Retry',
+    'Search' => 'Search',
     'Showing :from to :to of :total' => 'Showing :from to :to of :total',
     'This table has expired. Reload the page to continue.' => 'This table has expired. Reload the page to continue.',
     'This table needs a newer version of @xelqun/tables.' => 'This table needs a newer version of @xelqun/tables.',

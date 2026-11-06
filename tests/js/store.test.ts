@@ -12,7 +12,9 @@ function schema(): TableSchema {
         id: 'orders',
         token: 'token',
         endpoints: { query: '/query' },
+        searchable: false,
         query: {},
+        sort: null,
         columns: [],
         rows: [],
         pagination,
@@ -20,7 +22,7 @@ function schema(): TableSchema {
 }
 
 function result(page: number): TableResult {
-    return { query: { page }, rows: [], pagination: { ...pagination, page } };
+    return { query: { page }, sort: null, rows: [], pagination: { ...pagination, page } };
 }
 
 function response(body: unknown, status = 200): Response {

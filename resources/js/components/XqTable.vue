@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
 import { cn, useRegistry, XqButton } from '@xelqun/forms';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, watch } from 'vue';
 import { createTableStore } from '../core/store';
@@ -9,6 +10,7 @@ import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
 import type { TableQuery, TableSchema } from '../schema/types';
 import { builtInCells } from './cells';
 import XqTablePagination from './XqTablePagination.vue';
+import XqTableSearch from './XqTableSearch.vue';
 
 const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] }>();
 
@@ -24,6 +26,22 @@ const columns = computed(() =>
         cell: registry?.get(column.type) ?? builtInCells[column.type],
     })),
 );
+
+function sortDirection(name: string): 'asc' | 'desc' | null {
+    const { sort } = schema.value;
+
+    return sort === name ? 'asc' : sort === `-${name}` ? 'desc' : null;
+}
+
+function ariaSort(name: string): 'ascending' | 'descending' | undefined {
+    const direction = sortDirection(name);
+
+    return direction ? (direction === 'asc' ? 'ascending' : 'descending') : undefined;
+}
+
+function toggleSort(name: string): void {
+    void store.update({ sort: sortDirection(name) === 'asc' ? `-${name}` : name, page: 1 });
+}
 
 function syncUrl(query: TableQuery): void {
     const { pathname, search, hash } = window.location;
@@ -74,6 +92,12 @@ onMounted(() => {
                 {{ t('Retry') }}
             </XqButton>
         </div>
+        <XqTableSearch
+            v-if="schema.searchable"
+            :value="schema.query.search ?? ''"
+            :t="t"
+            @search="store.update({ search: $event, page: 1 })"
+        />
         <div
             :class="
                 cn(
@@ -89,9 +113,33 @@ onMounted(() => {
                             v-for="column in columns"
                             :key="column.name"
                             scope="col"
+                            :aria-sort="ariaSort(column.name)"
                             class="px-3 py-2 font-medium text-xq-muted-foreground text-left"
                         >
-                            {{ column.label }}
+                            <button
+                                v-if="column.sortable"
+                                type="button"
+                                class="gap-1 font-medium hover:text-xq-foreground inline-flex cursor-pointer items-center"
+                                @click="toggleSort(column.name)"
+                            >
+                                {{ column.label }}
+                                <ArrowUp
+                                    v-if="sortDirection(column.name) === 'asc'"
+                                    class="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <ArrowDown
+                                    v-else-if="sortDirection(column.name) === 'desc'"
+                                    class="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <ChevronsUpDown
+                                    v-else
+                                    class="size-3.5 opacity-50"
+                                    aria-hidden="true"
+                                />
+                            </button>
+                            <template v-else>{{ column.label }}</template>
                         </th>
                     </tr>
                 </thead>
