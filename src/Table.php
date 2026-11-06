@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Xelqun\Tables\Columns\Column;
+use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Schema\SchemaVersion;
 
 /**
@@ -86,6 +87,10 @@ abstract class Table
      */
     public function paginationPageOptions(array $options): static
     {
+        if ($options === []) {
+            throw new TableDefinitionException('The table ['.static::class.'] needs at least one page size.');
+        }
+
         $this->paginationPageOptions = array_values($options);
 
         return $this;
@@ -106,10 +111,21 @@ abstract class Table
      */
     public function getColumns(): array
     {
-        return $this->mountedColumns ??= array_values(array_filter(
+        if ($this->mountedColumns !== null) {
+            return $this->mountedColumns;
+        }
+
+        $columns = array_values(array_filter(
             array_map(fn (Column $column): Column => $column->mount($this), $this->columns()),
             fn (Column $column): bool => ! $column->isHidden(),
         ));
+        $names = array_map(fn (Column $column): string => $column->getName(), $columns);
+
+        if (count($names) !== count(array_unique($names))) {
+            throw new TableDefinitionException('The table ['.static::class.'] has two columns with the same name. Cells are keyed by name, so one would overwrite the other.');
+        }
+
+        return $this->mountedColumns = $columns;
     }
 
     /**
@@ -126,6 +142,7 @@ abstract class Table
             '$xq' => SchemaVersion::CURRENT,
             'pkg' => SchemaVersion::PACKAGE,
             'id' => $this->getId(),
+            ...$this->getClientMessages(),
             'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $columns),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
@@ -141,5 +158,21 @@ abstract class Table
                 'options' => $this->paginationPageOptions,
             ],
         ];
+    }
+
+    /**
+     * Text the browser shows, in this locale. It is written in English and uses
+     * that as the key, so only lines that differ have to travel.
+     *
+     * @return array{messages?: array<string, string>}
+     */
+    private function getClientMessages(): array
+    {
+        $lines = trans('xelqun-tables::client');
+        $messages = is_array($lines)
+            ? array_filter($lines, fn (string $text, string $key): bool => $text !== $key, ARRAY_FILTER_USE_BOTH)
+            : [];
+
+        return $messages === [] ? [] : ['messages' => $messages];
     }
 }

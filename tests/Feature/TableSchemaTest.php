@@ -1,9 +1,13 @@
 <?php
 
+use Illuminate\Database\Eloquent\Builder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Columns\TextColumn;
+use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Schema\SchemaVersion;
+use Xelqun\Tables\Table;
+use Xelqun\Tables\Tests\Fixtures\Category;
 use Xelqun\Tables\Tests\Fixtures\Product;
 use Xelqun\Tables\Tests\Fixtures\ProductsTable;
 
@@ -87,4 +91,61 @@ it('applies configureUsing before the caller has the last word', function () {
 it('reads visible() as the opposite of hidden()', function () {
     expect(TextColumn::make('a')->visible(false)->isHidden())->toBeTrue()
         ->and(TextColumn::make('a')->visible(fn (): bool => true)->isHidden())->toBeFalse();
+});
+
+class RelationColumnTable extends Table
+{
+    public function query(): Builder
+    {
+        return Product::query();
+    }
+
+    public function columns(): array
+    {
+        return [TextColumn::make('category'), TextColumn::make('list')->state(fn (Product $record) => Category::query()->get())];
+    }
+}
+
+class DuplicateColumnTable extends RelationColumnTable
+{
+    public function columns(): array
+    {
+        return [TextColumn::make('name'), TextColumn::make('name')->label('Again')];
+    }
+}
+
+class NoPageSizeTable extends RelationColumnTable
+{
+    protected function boot(): void
+    {
+        $this->paginationPageOptions([]);
+    }
+}
+
+it('sends a related record as its key, never its values', function () {
+    $category = Category::create(['name' => 'do not leak']);
+    Product::create(['name' => 'Keyboard', 'category_id' => $category->id]);
+
+    $schema = json_decode(json_encode(RelationColumnTable::make()->toSchema()), true);
+
+    expect($schema['rows'][0]['cells']['category']['state'])->toBe($category->id)
+        ->and($schema['rows'][0]['cells']['list']['state'])->toBe([$category->id])
+        ->and(json_encode($schema))->not->toContain('do not leak');
+});
+
+it('refuses two columns with the same name', function () {
+    DuplicateColumnTable::make()->getColumns();
+})->throws(TableDefinitionException::class);
+
+it('refuses an empty list of page sizes', function () {
+    NoPageSizeTable::make();
+})->throws(TableDefinitionException::class);
+
+it('sends translated text only when it differs from English', function () {
+    expect(tableSchema())->not->toHaveKey('messages');
+
+    app('translator')->setLoaded(['xelqun-tables' => ['client' => ['es' => ['No records found.' => 'Sin registros.']]]]);
+    app()->setLocale('es');
+
+    expect(tableSchema()['messages'])->toBe(['No records found.' => 'Sin registros.']);
 });

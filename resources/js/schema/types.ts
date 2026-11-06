@@ -29,6 +29,7 @@ export interface TableSchema {
     $xq: number;
     pkg: string;
     id: string;
+    messages?: Record<string, string>;
     columns: TableColumn[];
     rows: TableRow[];
     pagination: TablePagination;

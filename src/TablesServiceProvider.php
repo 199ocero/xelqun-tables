@@ -13,10 +13,16 @@ class TablesServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'xelqun-tables');
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../config/xelqun-tables.php' => config_path('xelqun-tables.php'),
             ], 'xelqun-tables-config');
+
+            $this->publishes([
+                __DIR__.'/../resources/lang' => lang_path('vendor/xelqun-tables'),
+            ], 'xelqun-tables-lang');
         }
     }
 }

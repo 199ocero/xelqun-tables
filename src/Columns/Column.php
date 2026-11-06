@@ -4,6 +4,7 @@ namespace Xelqun\Tables\Columns;
 
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Traits\Macroable;
 use Xelqun\Tables\Table;
@@ -203,6 +204,19 @@ abstract class Column
     {
         $state = $this->getState($record);
 
-        return ['state' => $state, ...$this->getCellProps($record, $state)];
+        return ['state' => $this->reduceToKeys($state), ...$this->getCellProps($record, $state)];
+    }
+
+    /**
+     * A column named after a relation would otherwise send the whole related
+     * record, which holds values nobody declared.
+     */
+    private function reduceToKeys(mixed $state): mixed
+    {
+        return match (true) {
+            $state instanceof Model => $state->getKey(),
+            $state instanceof Collection => $state->map(fn (mixed $item): mixed => $this->reduceToKeys($item))->values()->all(),
+            default => $state,
+        };
     }
 }

@@ -1,21 +1,27 @@
 <script setup lang="ts">
-import { cn, useRegistry, useTranslator } from '@xelqun/forms';
-import type { Component, HTMLAttributes } from 'vue';
+import { cn, translate, useRegistry } from '@xelqun/forms';
+import type { HTMLAttributes } from 'vue';
 import { computed } from 'vue';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
-import type { TableColumn, TableSchema } from '../schema/types';
+import type { TableSchema } from '../schema/types';
 import { builtInCells } from './cells';
 
 const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] }>();
 
 const registry = useRegistry();
-const t = useTranslator();
 const isSupported = computed(() =>
     (SUPPORTED_SCHEMA_VERSIONS as readonly number[]).includes(props.table.$xq),
 );
 
-function cellFor(column: TableColumn): Component | undefined {
-    return registry?.get(column.type) ?? builtInCells[column.type];
+const columns = computed(() =>
+    props.table.columns.map((column) => ({
+        ...column,
+        cell: registry?.get(column.type) ?? builtInCells[column.type],
+    })),
+);
+
+function t(text: string, replacements?: Record<string, string | number>): string {
+    return translate(props.table.messages, text, replacements);
 }
 </script>
 
@@ -29,7 +35,7 @@ function cellFor(column: TableColumn): Component | undefined {
             <thead class="border-xq-border bg-xq-muted/50 border-b">
                 <tr>
                     <th
-                        v-for="column in table.columns"
+                        v-for="column in columns"
                         :key="column.name"
                         scope="col"
                         class="px-3 py-2 font-medium text-xq-muted-foreground text-left"
@@ -44,10 +50,10 @@ function cellFor(column: TableColumn): Component | undefined {
                     :key="row.key"
                     class="border-xq-border border-b last:border-b-0"
                 >
-                    <td v-for="column in table.columns" :key="column.name" class="px-3 py-2">
+                    <td v-for="column in columns" :key="column.name" class="px-3 py-2">
                         <component
-                            :is="cellFor(column)"
-                            v-if="cellFor(column)"
+                            :is="column.cell"
+                            v-if="column.cell"
                             :column="column"
                             :cell="row.cells[column.name]"
                         />
@@ -58,7 +64,7 @@ function cellFor(column: TableColumn): Component | undefined {
                 </tr>
                 <tr v-if="table.rows.length === 0">
                     <td
-                        :colspan="table.columns.length"
+                        :colspan="columns.length"
                         class="px-3 py-8 text-xq-muted-foreground text-center"
                     >
                         {{ t('No records found.') }}

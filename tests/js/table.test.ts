@@ -62,6 +62,13 @@ describe('XqTable', () => {
         expect(wrapper.text()).toContain('No records found.');
     });
 
+    it('shows text in the language the server sent', () => {
+        const table = schema({ rows: [], messages: { 'No records found.': 'Sin registros.' } });
+        const wrapper = mount(XqTable, { props: { table } });
+
+        expect(wrapper.text()).toContain('Sin registros.');
+    });
+
     it('renders a plugin column from the forms registry', () => {
         const Stars = defineComponent({
             props: { column: Object, cell: Object },
