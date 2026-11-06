@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h } from 'vue';
+import { createApp, defineComponent, h } from 'vue';
 import { createXelqunForms, defaultComponents } from '@xelqun/forms';
 import { fieldNode, formSchema } from '@xelqun/forms/testing';
 import { builtInCells } from '../../resources/js/components/cells';
@@ -10,7 +10,7 @@ import type { TableSchema } from '../../resources/js/schema/types';
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 
 vi.mock('@inertiajs/vue3', () => ({
-    router: { replace },
+    router: { replace, on: vi.fn(() => vi.fn()) },
     Link: { props: ['href'], template: '<a data-inertia-link :href="href"><slot /></a>' },
 }));
 
@@ -612,6 +612,93 @@ describe('actions', () => {
             phase: 'run',
         });
         wrapper.unmount();
+    });
+
+    describe('in a menu', () => {
+        const group = (actions: ReturnType<typeof action>[], name = 'data#1') => ({
+            name,
+            props: {},
+            actions,
+        });
+
+        function items(): HTMLElement[] {
+            return [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+        }
+
+        async function openMenu(wrapper: ReturnType<typeof mountTable>): Promise<void> {
+            await wrapper
+                .find('[data-xq-action-group] button')
+                .trigger('keydown', { key: 'Enter' });
+            await flushPromises();
+        }
+
+        afterEach(() => {
+            document.body.innerHTML = '';
+        });
+
+        it('sends the row and the action of a menu item', async () => {
+            const fetchMock = respondWith({ query: {}, sort: null, activeFilters: 0, rows: [] });
+
+            vi.stubGlobal('fetch', fetchMock);
+
+            const wrapper = mountTable({
+                rows: [{ ...rows[0]!, actions: [group([action('touch')])] }],
+            });
+
+            await openMenu(wrapper);
+            items()[0]!.click();
+            await flushPromises();
+
+            expect(JSON.parse(sentBody(fetchMock))).toMatchObject({
+                action: 'touch',
+                kind: 'record',
+                record: '7',
+                phase: 'run',
+            });
+            wrapper.unmount();
+        });
+
+        it('renders a menu in the header and for selected rows', async () => {
+            const wrapper = mountTable({
+                rows,
+                headerActions: [group([action('import')], 'data#0')],
+                bulkActions: [group([action('archive')], 'data#0')],
+            });
+
+            await wrapper.find('tbody input, tbody [role="checkbox"]').trigger('click');
+            await flushPromises();
+
+            expect(wrapper.findAll('[data-xq-action-group]')).toHaveLength(2);
+            wrapper.unmount();
+        });
+    });
+
+    it('shows the notifications an action sends', async () => {
+        const body = {
+            query: {},
+            sort: null,
+            activeFilters: 0,
+            rows: [],
+            notifications: [{ title: 'Touched' }],
+        };
+
+        vi.stubGlobal('fetch', respondWith(body));
+
+        const app = createApp({ render: () => h('div') });
+
+        app.use(createXelqunForms());
+        app.mount(document.createElement('div'));
+
+        const wrapper = mountTable({ rows });
+
+        await wrapper.find('tbody [data-xq-action] button').trigger('click');
+        await flushPromises();
+
+        expect(document.querySelector('[data-slot="xq-notifications"]')?.textContent).toContain(
+            'Touched',
+        );
+        wrapper.unmount();
+        app.unmount();
     });
 
     it('sends a header action with no record', async () => {

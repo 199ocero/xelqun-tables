@@ -1,4 +1,4 @@
-import { HttpError, postJson, reportRequestFailure, translate } from '@xelqun/forms';
+import { HttpError, notify, postJson, reportRequestFailure, translate } from '@xelqun/forms';
 import type {
     ActionModal,
     ActionResult,
@@ -197,6 +197,8 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
 
                 try {
                     const response = await send<ActionResult>(node, 'run', modal?.state.data);
+
+                    response.notifications?.forEach(notify);
 
                     if (target.kind === 'bulk') {
                         clearSelection();

@@ -68,7 +68,7 @@ class ProductsTable extends Table
 - **Write PHP, not Vue.** Normal tables need no frontend code.
 - **Search and sort through relations.** Relations load up front, so rows don't each run a query.
 - **Filters are form fields.** Anything `xelqun/forms` can do works in a filter, including dependent options.
-- **Actions reuse forms.** Row, header and bulk actions get modals, uploads and live fields with no new code.
+- **Actions reuse forms.** Row, header and bulk actions get modals, uploads, live fields and notifications with no new code, and an `ActionGroup` puts them in a menu.
 - **Links keep working.** Search, sort, filters and the page live in the URL, so a refresh or a shared link shows the same rows.
 - **Secure by default.** Tables rebuild from an encrypted token, and every row comes back through your query on every request.
 - **Custom columns.** A column of your own is a PHP class and a Vue cell.

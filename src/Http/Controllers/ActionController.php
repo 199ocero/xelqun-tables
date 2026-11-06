@@ -5,6 +5,7 @@ namespace Xelqun\Tables\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Xelqun\Notifications\NotificationQueue;
 use Xelqun\Tables\Actions\TableActionHost;
 use Xelqun\Tables\Security\TableTokenEncrypter;
 
@@ -15,7 +16,7 @@ use Xelqun\Tables\Security\TableTokenEncrypter;
  */
 class ActionController
 {
-    public function __invoke(Request $request, TableTokenEncrypter $tokens): JsonResponse
+    public function __invoke(Request $request, TableTokenEncrypter $tokens, NotificationQueue $notifications): JsonResponse
     {
         $validated = $request->validate([
             'token' => ['required', 'string'],
@@ -47,9 +48,12 @@ class ActionController
 
         $result = $host->getConnection()->transaction(fn () => $action->run([], $validated['data'] ?? []));
 
+        $sentNotifications = $notifications->pull();
+
         return response()->json([
             'result' => $action->hasResult() ? $result : null,
             'redirect' => $action->getSuccessRedirectUrl(),
+            ...($sentNotifications === [] ? [] : ['notifications' => $sentNotifications]),
         ]);
     }
 }

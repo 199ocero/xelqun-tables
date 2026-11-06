@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Xelqun\Actions\Action;
+use Xelqun\Actions\ActionGroup;
 use Xelqun\Actions\ActionSet;
+use Xelqun\Forms\Components\Component;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Table;
 
@@ -57,7 +59,7 @@ final class TableActionHost extends ActionSet
             self::BULK => $this->getTable()->bulkActions(),
             default => [],
         };
-        $names = array_map(fn (Action $action): string => $action->getName(), $actions);
+        $names = array_map(fn (Action $action): string => $action->getName(), ActionGroup::flatten($actions));
 
         if (count($names) !== count(array_unique($names))) {
             throw new TableDefinitionException('The table ['.$this->getTable()::class.'] has two actions with the same name.');
@@ -83,8 +85,8 @@ final class TableActionHost extends ActionSet
      */
     public function findAction(string $name): ?Action
     {
-        foreach ($this->getComponents() as $action) {
-            if ($action instanceof Action && $action->getName() === $name) {
+        foreach (ActionGroup::flatten($this->getComponents()) as $action) {
+            if ($action->getName() === $name) {
                 return $action;
             }
         }
@@ -95,17 +97,24 @@ final class TableActionHost extends ActionSet
     /**
      * The actions the viewer can see, with only what a button needs.
      *
-     * @return array<int, array{name: string, props: mixed}>
+     * @param  array<int, Component>|null  $components
+     * @return array<int, array{name: string, props: mixed, actions?: array<int, mixed>}>
      */
-    public function toActionNodes(): array
+    public function toActionNodes(?array $components = null): array
     {
         $nodes = [];
 
-        foreach ($this->getComponents() as $action) {
-            $node = $action instanceof Action ? $action->toNode() : null;
+        foreach ($components ?? $this->getComponents() as $component) {
+            $node = $component->toNode();
 
-            if ($node !== null && ! $node['hidden']) {
-                $nodes[] = ['name' => $action->getName(), 'props' => $node['props']];
+            if ($node === null || $node['hidden']) {
+                continue;
+            }
+
+            if ($component instanceof ActionGroup) {
+                $nodes[] = ['name' => $component->getKey(), 'props' => $node['props'], 'actions' => $this->toActionNodes($component->getChildComponents())];
+            } elseif ($component instanceof Action) {
+                $nodes[] = ['name' => $component->getName(), 'props' => $node['props']];
             }
         }
 

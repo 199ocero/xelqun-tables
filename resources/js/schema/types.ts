@@ -19,6 +19,8 @@ export interface TableCell {
 export interface TableAction {
     name: string;
     props: Record<string, any>;
+    /** Set on a menu, which holds these in place of running anything. */
+    actions?: TableAction[];
 }
 
 export interface TableRow {

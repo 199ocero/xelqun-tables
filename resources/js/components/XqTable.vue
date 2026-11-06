@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { cn, useRegistry, XqAction, XqButton, XqCheckbox } from '@xelqun/forms';
+import { cn, useRegistry, XqAction, XqActionGroup, XqButton, XqCheckbox } from '@xelqun/forms';
 import type { SchemaNode } from '@xelqun/forms';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
@@ -47,10 +47,10 @@ const hasToolbar = computed(
 function actionNode(action: TableAction): SchemaNode {
     return {
         key: action.name,
-        type: 'action',
+        type: action.actions ? 'action-group' : 'action',
         hidden: false,
         props: action.props,
-        children: [],
+        children: action.actions?.map(actionNode) ?? [],
         deps: [],
     };
 }
@@ -138,7 +138,8 @@ onMounted(() => {
                 :t="t"
                 @apply="store.update({ filters: $event, page: 1 })"
             />
-            <XqAction
+            <component
+                :is="action.actions ? XqActionGroup : XqAction"
                 v-for="action in schema.headerActions"
                 :key="action.name"
                 :node="actionNode(action)"
@@ -154,7 +155,8 @@ onMounted(() => {
             @select-all="store.selectAll()"
             @clear="store.clearSelection()"
         >
-            <XqAction
+            <component
+                :is="action.actions ? XqActionGroup : XqAction"
                 v-for="action in schema.bulkActions"
                 :key="action.name"
                 :node="actionNode(action)"
@@ -164,7 +166,7 @@ onMounted(() => {
         <div
             :class="
                 cn(
-                    'rounded-xq-lg border-xq-border overflow-x-auto border transition-opacity',
+                    'rounded-xq-lg border-xq-border relative overflow-x-auto border transition-opacity',
                     loading && 'opacity-60',
                 )
             "
@@ -252,7 +254,8 @@ onMounted(() => {
                         </td>
                         <td v-if="hasRowActions" class="px-3 py-2">
                             <div class="gap-1 flex justify-end">
-                                <XqAction
+                                <component
+                                    :is="action.actions ? XqActionGroup : XqAction"
                                     v-for="action in row.actions"
                                     :key="action.name"
                                     :node="actionNode(action)"

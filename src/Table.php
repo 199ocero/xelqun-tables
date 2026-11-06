@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Xelqun\Actions\Action;
+use Xelqun\Actions\ActionGroup;
 use Xelqun\Forms\Security\FormToken;
 use Xelqun\Forms\Security\FormTokenEncrypter;
 use Xelqun\Tables\Actions\BulkAction;
@@ -96,8 +97,9 @@ abstract class Table
      * Buttons on each row. An action does nothing until its own authorize()
      * allows it, because being allowed to see the table isn't being allowed to
      * do this. A closure gets the row as $record, so name the parameter that.
+     * Put some in an ActionGroup to show them as a menu.
      *
-     * @return array<int, Action>
+     * @return array<int, Action|ActionGroup>
      */
     public function recordActions(): array
     {
@@ -107,7 +109,7 @@ abstract class Table
     /**
      * Buttons above the table, with no record.
      *
-     * @return array<int, Action>
+     * @return array<int, Action|ActionGroup>
      */
     public function headerActions(): array
     {
@@ -117,7 +119,7 @@ abstract class Table
     /**
      * Buttons for the selected rows, which reach their closures as $records.
      *
-     * @return array<int, BulkAction>
+     * @return array<int, BulkAction|ActionGroup>
      */
     public function bulkActions(): array
     {
