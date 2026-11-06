@@ -6,8 +6,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
-use Xelqun\Forms\Actions\Action;
-use Xelqun\Forms\Form;
+use Xelqun\Actions\Action;
+use Xelqun\Actions\ActionSet;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Table;
 
@@ -22,7 +22,7 @@ use Xelqun\Tables\Table;
  *
  * @internal
  */
-final class TableActionHost extends Form
+final class TableActionHost extends ActionSet
 {
     public const string RECORD = 'record';
 
@@ -34,8 +34,6 @@ final class TableActionHost extends Form
 
     /** @var Collection<int, Model>|null */
     private ?Collection $selectedRecords = null;
-
-    private bool $hasFilledInModels = false;
 
     /**
      * @param  array<int, string>  $selection  The keys of a bulk action's rows.
@@ -51,7 +49,7 @@ final class TableActionHost extends Form
         ]);
     }
 
-    public function schema(): array
+    public function actions(): array
     {
         $actions = match ($this->context['kind']) {
             self::RECORD => $this->getTable()->recordActions(),
@@ -66,26 +64,6 @@ final class TableActionHost extends Form
         }
 
         return $actions;
-    }
-
-    /**
-     * A policy needs the model when there is no record, as in authorize('create').
-     */
-    public function getComponents(): array
-    {
-        $components = parent::getComponents();
-
-        if (! $this->hasFilledInModels) {
-            $this->hasFilledInModels = true;
-
-            foreach ($components as $action) {
-                if ($action instanceof Action && $action->getModel() === null) {
-                    $action->model($this->model());
-                }
-            }
-        }
-
-        return $components;
     }
 
     /**

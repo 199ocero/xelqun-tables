@@ -47,6 +47,9 @@ class ActionController
 
         $result = $host->getConnection()->transaction(fn () => $action->run([], $validated['data'] ?? []));
 
-        return response()->json(['result' => $action->hasResult() ? $result : null]);
+        return response()->json([
+            'result' => $action->hasResult() ? $result : null,
+            'redirect' => $action->getSuccessRedirectUrl(),
+        ]);
     }
 }

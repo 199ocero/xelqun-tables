@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use LogicException;
-use Xelqun\Forms\Actions\Action;
+use Xelqun\Actions\Action;
 
 /**
  * An action on the rows the viewer selected. Closures receive them as $records,

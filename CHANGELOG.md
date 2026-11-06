@@ -2,6 +2,14 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Changed
+
+- **Action buttons no longer dim while the rows reload.** The clicked button stays busy until the new rows arrive.
+- **`Action::successRedirectUrl()` works in tables.** The rows don't reload when the action sends the user away.
+- **Needs the next `xelqun/forms` release**, where actions moved to `Xelqun\Actions`. Update your `Action` imports, and keep importing `BulkAction` from `Xelqun\Tables\Actions`.
+
 ## 0.1.0 - 2026-11-06
 
 The first version. It needs `xelqun/forms` 0.3.

@@ -232,6 +232,62 @@ describe('table store', () => {
         expect(store.selected.value.size).toBe(0);
     });
 
+    describe('after an action runs', () => {
+        const node = {
+            key: 'touch',
+            type: 'action',
+            hidden: false,
+            props: {},
+            children: [],
+            deps: [],
+        } as any;
+
+        it('stays busy until the new rows arrive, without dimming the other buttons', async () => {
+            let finishQuery = (): void => {};
+            const rows = new Promise<void>((resolve) => (finishQuery = resolve));
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn(async (url: string) => {
+                    if (url === '/action') {
+                        return response({});
+                    }
+
+                    await rows;
+
+                    return response(result(1));
+                }),
+            );
+
+            const runner = createTableStore(schema()).actionRunner({ kind: 'header' });
+            let isFinished = false;
+            const run = runner.runAction(node).then(() => (isFinished = true));
+
+            await flushPromises();
+
+            expect(isFinished).toBe(false);
+            expect(runner.processing.value).toBe(false);
+
+            finishQuery();
+            await run;
+
+            expect(isFinished).toBe(true);
+        });
+
+        it('does not load rows when the action sends the user away', async () => {
+            const fetchMock = vi.fn(async () => response({ redirect: '/products' }));
+
+            vi.stubGlobal('fetch', fetchMock);
+
+            const result = await createTableStore(schema())
+                .actionRunner({ kind: 'header' })
+                .runAction(node);
+
+            expect(result?.redirect).toBe('/products');
+            expect(fetchMock).toHaveBeenCalledOnce();
+        });
+    });
+
     it('sends the selection with a bulk action, then clears it', async () => {
         const fetchMock = vi.fn(async (url: string) =>
             response(url === '/action' ? {} : result(1)),

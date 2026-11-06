@@ -174,7 +174,8 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         };
 
         return {
-            processing: loading,
+            // Reloading the rows isn't the button's business, and dimming them all would flicker.
+            processing: ref(false),
             t,
             async mountAction(node) {
                 try {
@@ -201,7 +202,9 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                         clearSelection();
                     }
 
-                    void load(lastQuery);
+                    if (!response.redirect) {
+                        await load(lastQuery);
+                    }
 
                     return response;
                 } catch (failure) {

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
-use Xelqun\Forms\Actions\Action;
+use Xelqun\Actions\Action;
 use Xelqun\Forms\Components\FileUpload;
 use Xelqun\Forms\Components\Select;
 use Xelqun\Forms\Components\TextInput;
@@ -240,6 +240,28 @@ it('sends a result only when the action says so', function () {
 
     $this->runTableAction(ActionsTable::make(), 'answer', $record->id)->assertJsonPath('result', "row {$record->id}");
     $this->runTableAction(ActionsTable::make(), 'touch', $record->id)->assertJsonPath('result', null);
+});
+
+it('sends the user away when the action says so, and ignores an unsafe address', function () {
+    $table = new class extends ActionsTable
+    {
+        public function headerActions(): array
+        {
+            return [
+                Action::make('safe')->authorize(true)->successRedirectUrl('/products')->action(fn () => null),
+                Action::make('unsafe')->authorize(true)->successRedirectUrl('javascript:alert(1)')->action(fn () => null),
+            ];
+        }
+    };
+    $call = fn (string $name) => $this->postJson(route('xelqun.tables.action'), [
+        'token' => $table->toSchema()['token'],
+        'kind' => 'header',
+        'action' => $name,
+        'phase' => 'run',
+    ]);
+
+    $call('safe')->assertOk()->assertJsonPath('redirect', '/products');
+    $call('unsafe')->assertOk()->assertJsonPath('redirect', null);
 });
 
 it('creates from a header action, with no record', function () {
