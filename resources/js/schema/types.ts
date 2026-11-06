@@ -25,12 +25,23 @@ export interface TablePagination {
     options: number[];
 }
 
-export interface TableSchema {
+/**
+ * The table's state as the URL holds it. Defaults are left out.
+ */
+export type TableQuery = Record<string, any>;
+
+export interface TableResult {
+    query: TableQuery;
+    rows: TableRow[];
+    pagination: TablePagination;
+}
+
+export interface TableSchema extends TableResult {
     $xq: number;
     pkg: string;
     id: string;
+    token: string;
+    endpoints: { query: string };
     messages?: Record<string, string>;
     columns: TableColumn[];
-    rows: TableRow[];
-    pagination: TablePagination;
 }

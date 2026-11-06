@@ -2,6 +2,9 @@
     "$xq": 1,
     "pkg": "0.1.0",
     "id": "products-table",
+    "endpoints": {
+        "query": "\/_xelqun\/tables\/query"
+    },
     "columns": [
         {
             "name": "name",
@@ -22,6 +25,7 @@
             "props": {}
         }
     ],
+    "query": {},
     "rows": [
         {
             "key": "1",

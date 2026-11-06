@@ -6,9 +6,12 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Xelqun\Forms\Security\FormToken;
+use Xelqun\Forms\Security\FormTokenEncrypter;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Schema\SchemaVersion;
+use Xelqun\Tables\State\TableState;
 
 /**
  * A table of records, defined in PHP and rendered by XqTable.
@@ -87,8 +90,8 @@ abstract class Table
      */
     public function paginationPageOptions(array $options): static
     {
-        if ($options === []) {
-            throw new TableDefinitionException('The table ['.static::class.'] needs at least one page size.');
+        if ($options === [] || min($options) < 1) {
+            throw new TableDefinitionException('The table ['.static::class.'] needs at least one page size, and none below 1.');
         }
 
         $this->paginationPageOptions = array_values($options);
@@ -129,21 +132,48 @@ abstract class Table
     }
 
     /**
+     * The first render. It reads the page's URL, so a link or a refresh shows
+     * the same page of records.
+     *
      * @return array<string, mixed>
      */
     public function toSchema(): array
     {
         abort_unless($this->authorize(auth()->user()), 403);
 
-        $columns = $this->getColumns();
-        $records = $this->query()->paginate($this->paginationPageOptions[0], page: 1);
+        $input = request()->query($this->getId());
 
         return [
             '$xq' => SchemaVersion::CURRENT,
             'pkg' => SchemaVersion::PACKAGE,
             'id' => $this->getId(),
+            'token' => $this->makeToken(),
+            'endpoints' => ['query' => route('xelqun.tables.query', absolute: false)],
             ...$this->getClientMessages(),
-            'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $columns),
+            'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $this->getColumns()),
+            ...$this->toResult(TableState::from(is_array($input) ? $input : [], $this)),
+        ];
+    }
+
+    /**
+     * The part of the schema that changes with the viewer's state.
+     *
+     * @internal
+     *
+     * @return array{query: object, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
+     */
+    public function toResult(TableState $state): array
+    {
+        $columns = $this->getColumns();
+        $query = $this->query();
+        $total = $query->toBase()->getCountForPagination();
+
+        // Counted first, because deleting the last row of the last page leaves the viewer past the end.
+        $state = $state->withPage(min($state->page, max((int) ceil($total / $state->perPage), 1)));
+        $records = $query->paginate($state->perPage, page: $state->page, total: $total);
+
+        return [
+            'query' => (object) $state->toQuery($this),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
                 'cells' => collect($columns)
@@ -158,6 +188,16 @@ abstract class Table
                 'options' => $this->paginationPageOptions,
             ],
         ];
+    }
+
+    public function makeToken(): string
+    {
+        return app(FormTokenEncrypter::class)->encrypt(new FormToken(
+            formClass: static::class,
+            recordKey: null,
+            userId: auth()->id(),
+            context: ['context' => $this->context, 'id' => $this->tableId],
+        ));
     }
 
     /**

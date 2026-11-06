@@ -1,16 +1,23 @@
-import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 import { createXelqunForms, defaultComponents } from '@xelqun/forms';
 import { builtInCells } from '../../resources/js/components/cells';
 import XqTable from '../../resources/js/components/XqTable.vue';
 import type { TableSchema } from '../../resources/js/schema/types';
 
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock('@inertiajs/vue3', () => ({ router: { replace } }));
+
 function schema(overrides: Partial<TableSchema> = {}): TableSchema {
     return {
         $xq: 1,
         pkg: '0.1.0',
         id: 'products-table',
+        token: 'token',
+        endpoints: { query: '/query' },
+        query: {},
         columns: [{ name: 'name', type: 'text-column', label: 'Name', props: {} }],
         rows: [{ key: '1', cells: { name: { state: 'Keyboard' } } }],
         pagination: { page: 1, perPage: 10, total: 1, lastPage: 1, options: [10] },
@@ -18,7 +25,152 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
     };
 }
 
+function respondWith(result: Partial<TableSchema>, status = 200) {
+    return vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() =>
+        Promise.resolve(new Response(JSON.stringify(result), { status })),
+    );
+}
+
+function sentBody(fetchMock: ReturnType<typeof respondWith>, call = 0): string {
+    return fetchMock.mock.calls[call]![1].body as string;
+}
+
+afterEach(() => {
+    vi.unstubAllGlobals();
+    replace.mockClear();
+    window.history.replaceState(null, '', '/');
+});
+
 describe('XqTable', () => {
+    const paged = { page: 1, perPage: 1, total: 3, lastPage: 3, options: [1, 2] };
+
+    it('asks for the next page and puts it in the url', async () => {
+        const fetchMock = respondWith({
+            query: { page: 2 },
+            rows: [],
+            pagination: { ...paged, page: 2 },
+        });
+
+        vi.stubGlobal('fetch', fetchMock);
+        window.history.replaceState(null, '', '/products?tab=a&other[page]=9');
+
+        const wrapper = mount(XqTable, { props: { table: schema({ pagination: paged }) } });
+
+        await wrapper.find('button[aria-label="Next page"]').trigger('click');
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock))).toEqual({
+            token: 'token',
+            query: { page: 2 },
+        });
+        expect(replace).toHaveBeenCalledWith({
+            url: '/products?tab=a&other[page]=9&products-table[page]=2',
+            preserveState: true,
+            preserveScroll: true,
+        });
+    });
+
+    it('leaves the url alone when it answers after leaving the page', async () => {
+        vi.stubGlobal('fetch', respondWith({ query: { page: 2 }, rows: [], pagination: paged }));
+
+        const wrapper = mount(XqTable, { props: { table: schema({ pagination: paged }) } });
+
+        await wrapper.find('button[aria-label="Next page"]').trigger('click');
+        wrapper.unmount();
+        await flushPromises();
+
+        expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('keeps its buttons from submitting a form around it', () => {
+        const wrapper = mount(XqTable, { props: { table: schema({ pagination: paged }) } });
+
+        expect(
+            wrapper.findAll('button').every((button) => button.attributes('type') === 'button'),
+        ).toBe(true);
+    });
+
+    it("shows the version message for a schema it can't read", () => {
+        const { query: _query, ...renamed } = schema({ $xq: 2 });
+
+        window.history.replaceState(null, '', '/products?products-table[page]=2');
+
+        const wrapper = mount(XqTable, { props: { table: renamed as TableSchema } });
+
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+
+    it('turns off the buttons at the ends', () => {
+        const wrapper = mount(XqTable, { props: { table: schema({ pagination: paged }) } });
+
+        expect(
+            wrapper.find('button[aria-label="Previous page"]').attributes('disabled'),
+        ).toBeDefined();
+        expect(
+            wrapper.find('button[aria-label="Next page"]').attributes('disabled'),
+        ).toBeUndefined();
+    });
+
+    it('loads the url when it is newer than the page, as after Back', async () => {
+        const fetchMock = respondWith({
+            query: { page: 2 },
+            rows: [],
+            pagination: { ...paged, page: 2 },
+        });
+
+        vi.stubGlobal('fetch', fetchMock);
+        window.history.replaceState(null, '', '/products?products-table[page]=2');
+        mount(XqTable, { props: { table: schema({ pagination: paged }) } });
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock)).query).toEqual({ page: '2' });
+    });
+
+    it('sends nothing when the url matches the page', async () => {
+        const fetchMock = respondWith({});
+
+        vi.stubGlobal('fetch', fetchMock);
+        window.history.replaceState(null, '', '/products?products-table[page]=2');
+        mount(XqTable, { props: { table: schema({ query: { page: 2 } }) } });
+        await flushPromises();
+
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('offers a retry when a request fails', async () => {
+        const fetchMock = respondWith({}, 500);
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table: schema({ pagination: paged }) } });
+
+        await wrapper.find('button[aria-label="Next page"]').trigger('click');
+        await flushPromises();
+
+        const alert = wrapper.find('[role="alert"]');
+
+        expect(alert.text()).toContain('Could not load the records.');
+
+        await alert.find('button').trigger('click');
+        await flushPromises();
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(sentBody(fetchMock, 1)).toBe(sentBody(fetchMock));
+    });
+
+    it('starts over when a visit brings a new table', async () => {
+        const wrapper = mount(XqTable, { props: { table: schema() } });
+
+        await wrapper.setProps({
+            table: schema({
+                token: 'new',
+                rows: [{ key: '2', cells: { name: { state: 'Mouse' } } }],
+            }),
+        });
+
+        expect(wrapper.find('tbody td').text()).toBe('Mouse');
+    });
+
     it('renders headers and cells', () => {
         const wrapper = mount(XqTable, { props: { table: schema() } });
 

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Columns\TextColumn;
@@ -31,7 +32,7 @@ function tableSchema(): array
 it('keeps the shape of the schema', function () {
     Product::create(['name' => 'Keyboard', 'price' => 120]);
 
-    expect(json_encode(ProductsTable::make()->toSchema(), JSON_PRETTY_PRINT))->toMatchSnapshot();
+    expect(json_encode(Arr::except(ProductsTable::make()->toSchema(), 'token'), JSON_PRETTY_PRINT))->toMatchSnapshot();
 });
 
 it('sends the version the browser checks', function () {
@@ -116,9 +117,11 @@ class DuplicateColumnTable extends RelationColumnTable
 
 class NoPageSizeTable extends RelationColumnTable
 {
+    public static array $options = [];
+
     protected function boot(): void
     {
-        $this->paginationPageOptions([]);
+        $this->paginationPageOptions(self::$options);
     }
 }
 
@@ -137,9 +140,11 @@ it('refuses two columns with the same name', function () {
     DuplicateColumnTable::make()->getColumns();
 })->throws(TableDefinitionException::class);
 
-it('refuses an empty list of page sizes', function () {
+it('refuses page sizes it can\'t divide by', function (array $options) {
+    NoPageSizeTable::$options = $options;
+
     NoPageSizeTable::make();
-})->throws(TableDefinitionException::class);
+})->throws(TableDefinitionException::class)->with([[[]], [[0]], [[10, -1]]]);
 
 it('sends translated text only when it differs from English', function () {
     expect(tableSchema())->not->toHaveKey('messages');

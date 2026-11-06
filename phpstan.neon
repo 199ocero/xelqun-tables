@@ -5,6 +5,7 @@ parameters:
     paths:
         - src/
         - config/
+        - routes/
         - tests/TestCase.php
 
     level: 6

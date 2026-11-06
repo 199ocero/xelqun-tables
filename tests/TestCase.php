@@ -7,9 +7,12 @@ use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Xelqun\Forms\FormsServiceProvider;
 use Xelqun\Tables\TablesServiceProvider;
+use Xelqun\Tables\Testing\InteractsWithTables;
 
 abstract class TestCase extends Orchestra
 {
+    use InteractsWithTables;
+
     protected function getPackageProviders($app): array
     {
         return [FormsServiceProvider::class, TablesServiceProvider::class];
