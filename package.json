@@ -1,6 +1,6 @@
 {
     "name": "@xelqun/tables",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Vue renderer for Xelqun Tables: PHP-defined, schema-driven tables for Laravel + Inertia.",
     "license": "MIT",
     "repository": {
@@ -33,7 +33,7 @@
         "@inertiajs/vue3": "^3.0.0",
         "@vitejs/plugin-vue": "^6.0.0",
         "@vue/test-utils": "^2.4.6",
-        "@xelqun/forms": "^0.3.0",
+        "@xelqun/forms": "^0.4.0",
         "happy-dom": "^21.0.4",
         "reka-ui": "^2.11.0",
         "typescript": "^5.2.2",
@@ -44,7 +44,7 @@
     },
     "peerDependencies": {
         "@inertiajs/vue3": "^3.0.0",
-        "@xelqun/forms": "^0.3.0",
+        "@xelqun/forms": "^0.4.0",
         "reka-ui": "^2.11.0",
         "vue": "^3.5.0"
     },

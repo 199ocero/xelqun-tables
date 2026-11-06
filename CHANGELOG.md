@@ -2,13 +2,20 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
-## Unreleased
+## 0.2.0 - 2026-11-06
+
+This release needs `xelqun/forms` 0.4. The schema version (`$xq`) stays 1.
+
+### Upgrading
+
+Update both halves together: `composer update xelqun/tables xelqun/forms` and `npm install @xelqun/tables@0.2.0 @xelqun/forms@0.4.0`.
+
+- **Actions moved.** `Action` is now `Xelqun\Actions\Action`. `BulkAction` stays in `Xelqun\Tables\Actions`.
 
 ### Changed
 
 - **Action buttons no longer dim while the rows reload.** The clicked button stays busy until the new rows arrive.
 - **`Action::successRedirectUrl()` works in tables.** The rows don't reload when the action sends the user away.
-- **Needs the next `xelqun/forms` release**, where actions moved to `Xelqun\Actions`. Update your `Action` imports, and keep importing `BulkAction` from `Xelqun\Tables\Actions`.
 
 ## 0.1.0 - 2026-11-06
 
