@@ -2,7 +2,7 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
-## Unreleased
+## 0.1.0 - 2026-11-06
 
 The first version. It needs `xelqun/forms` 0.3.
 
