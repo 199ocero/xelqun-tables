@@ -6,7 +6,11 @@
  */
 
 return [
+    'Actions' => 'Actions',
     'Apply' => 'Apply',
+    'Are you sure?' => 'Are you sure?',
+    'Cancel' => 'Cancel',
+    'Confirm' => 'Confirm',
     'Could not load the records.' => 'Could not load the records.',
     'Filters' => 'Filters',
     'Next page' => 'Next page',
@@ -16,8 +20,10 @@ return [
     'Previous page' => 'Previous page',
     'Reset' => 'Reset',
     'Retry' => 'Retry',
+    'Save' => 'Save',
     'Search' => 'Search',
     'Showing :from to :until of :total' => 'Showing :from to :until of :total',
+    'That action could not run.' => 'That action could not run.',
     'This table has expired. Reload the page to continue.' => 'This table has expired. Reload the page to continue.',
     'This table needs a newer version of @xelqun/tables.' => 'This table needs a newer version of @xelqun/tables.',
     'Unknown column type: :type' => 'Unknown column type: :type',

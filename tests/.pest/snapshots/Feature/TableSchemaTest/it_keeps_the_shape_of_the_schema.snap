@@ -3,7 +3,8 @@
     "pkg": "0.1.0",
     "id": "products-table",
     "endpoints": {
-        "query": "\/_xelqun\/tables\/query"
+        "query": "\/_xelqun\/tables\/query",
+        "action": "\/_xelqun\/tables\/action"
     },
     "searchable": false,
     "columns": [
@@ -29,6 +30,7 @@
             "props": {}
         }
     ],
+    "headerActions": [],
     "filters": null,
     "filterDefaults": {},
     "query": {},
@@ -47,7 +49,8 @@
                 "shouted": {
                     "state": "KEYBOARD"
                 }
-            }
+            },
+            "actions": []
         }
     ],
     "pagination": {

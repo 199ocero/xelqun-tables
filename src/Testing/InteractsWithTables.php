@@ -25,4 +25,41 @@ trait InteractsWithTables
             'query' => $query,
         ]);
     }
+
+    /**
+     * Open an action's modal.
+     *
+     * @return TestResponse<Response>
+     */
+    public function mountTableAction(Table $table, string $name, int|string|null $record = null): TestResponse
+    {
+        return $this->postTableAction($table, $name, $record, 'mount', null);
+    }
+
+    /**
+     * Run an action. $record is the row's key, for an action on a row.
+     *
+     * @param  array<string, mixed>|null  $data  The modal's values.
+     * @return TestResponse<Response>
+     */
+    public function runTableAction(Table $table, string $name, int|string|null $record = null, ?array $data = null): TestResponse
+    {
+        return $this->postTableAction($table, $name, $record, 'run', $data);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $data
+     * @return TestResponse<Response>
+     */
+    private function postTableAction(Table $table, string $name, int|string|null $record, string $phase, ?array $data): TestResponse
+    {
+        return $this->postJson(route('xelqun.tables.action'), [
+            'token' => $table->makeToken(),
+            'action' => $name,
+            'kind' => $record === null ? 'header' : 'record',
+            'record' => $record === null ? null : (string) $record,
+            'phase' => $phase,
+            'data' => $data,
+        ]);
+    }
 }

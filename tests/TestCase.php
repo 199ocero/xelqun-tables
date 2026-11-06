@@ -34,6 +34,7 @@ abstract class TestCase extends Orchestra
             $table->string('status')->nullable();
             $table->boolean('is_featured')->default(false);
             $table->decimal('price', 12, 2)->default(0);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

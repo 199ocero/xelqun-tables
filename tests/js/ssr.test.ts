@@ -15,7 +15,8 @@ const table: TableSchema = {
     pkg: '0.1.0',
     id: 'products-table',
     token: 'token',
-    endpoints: { query: '/query' },
+    endpoints: { query: '/query', action: '/action' },
+    headerActions: [],
     searchable: true,
     filters: null,
     filterDefaults: {},
@@ -24,8 +25,12 @@ const table: TableSchema = {
     activeFilters: 0,
     columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: true, props: {} }],
     rows: [
-        { key: '1', cells: { name: { state: 'Keyboard', url: '/products/1' } } },
-        { key: '2', cells: { name: { state: 'Mouse', url: 'https://example.com/2' } } },
+        { key: '1', cells: { name: { state: 'Keyboard', url: '/products/1' } }, actions: [] },
+        {
+            key: '2',
+            cells: { name: { state: 'Mouse', url: 'https://example.com/2' } },
+            actions: [],
+        },
     ],
     pagination: { page: 1, perPage: 10, total: 2, lastPage: 1, options: [10, 25] },
 };

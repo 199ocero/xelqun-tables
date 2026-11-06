@@ -7,8 +7,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Xelqun\Forms\Actions\Action;
 use Xelqun\Forms\Security\FormToken;
 use Xelqun\Forms\Security\FormTokenEncrypter;
+use Xelqun\Tables\Actions\TableActionHost;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Filters\BaseFilter;
@@ -86,9 +88,47 @@ abstract class Table
         return [];
     }
 
+    /**
+     * Buttons on each row. An action does nothing until its own authorize()
+     * allows it, because being allowed to see the table isn't being allowed to
+     * do this. A closure gets the row as $record, so name the parameter that.
+     *
+     * @return array<int, Action>
+     */
+    public function recordActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * Buttons above the table, with no record.
+     *
+     * @return array<int, Action>
+     */
+    public function headerActions(): array
+    {
+        return [];
+    }
+
     public function authorize(?Authenticatable $user): bool
     {
         return true;
+    }
+
+    /**
+     * Find a row, staying inside query(). A global scope, because a where added
+     * here would escape an orWhere in query() and reach other rows.
+     */
+    public function resolveRecord(int|string $key): Model
+    {
+        $query = $this->query();
+
+        // A word compared with an integer column is an error on some databases.
+        abort_if($query->getModel()->getKeyType() === 'int' && ! ctype_digit((string) $key), 404);
+
+        return $query
+            ->withGlobalScope('xelqun-record', fn (Builder $scoped): Builder => $scoped->whereKey($key))
+            ->firstOrFail();
     }
 
     /**
@@ -248,10 +288,14 @@ abstract class Table
             'pkg' => SchemaVersion::PACKAGE,
             'id' => $this->getId(),
             'token' => $this->makeToken(),
-            'endpoints' => ['query' => route('xelqun.tables.query', absolute: false)],
+            'endpoints' => [
+                'query' => route('xelqun.tables.query', absolute: false),
+                'action' => route('xelqun.tables.action', absolute: false),
+            ],
             'searchable' => $this->isSearchable(),
             ...$this->getClientMessages(),
             'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $this->getColumns()),
+            'headerActions' => TableActionHost::for($this, TableActionHost::HEADER)->toActionNodes(),
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),
             ...$result,
@@ -268,6 +312,7 @@ abstract class Table
     public function toResult(TableState $state): array
     {
         $columns = $this->getColumns();
+        $hasRecordActions = $this->recordActions() !== [];
         $query = $this->buildQuery($state);
         $total = $query->toBase()->getCountForPagination();
 
@@ -284,6 +329,7 @@ abstract class Table
                 'cells' => collect($columns)
                     ->mapWithKeys(fn (Column $column): array => [$column->getName() => $column->toCell($record)])
                     ->all(),
+                'actions' => $hasRecordActions ? TableActionHost::for($this, TableActionHost::RECORD, $record)->toActionNodes() : [],
             ])->all(),
             'pagination' => [
                 'page' => $records->currentPage(),

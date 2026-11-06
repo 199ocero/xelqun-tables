@@ -20,7 +20,8 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         pkg: '0.1.0',
         id: 'products-table',
         token: 'token',
-        endpoints: { query: '/query' },
+        endpoints: { query: '/query', action: '/action' },
+        headerActions: [],
         searchable: false,
         filters: null,
         filterDefaults: {},
@@ -28,13 +29,13 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         sort: null,
         activeFilters: 0,
         columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} }],
-        rows: [{ key: '1', cells: { name: { state: 'Keyboard' } } }],
+        rows: [{ key: '1', cells: { name: { state: 'Keyboard' } }, actions: [] }],
         pagination: { page: 1, perPage: 10, total: 1, lastPage: 1, options: [10] },
         ...overrides,
     };
 }
 
-function respondWith(result: Partial<TableSchema>, status = 200) {
+function respondWith(result: Record<string, unknown>, status = 200) {
     return vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() =>
         Promise.resolve(new Response(JSON.stringify(result), { status })),
     );
@@ -278,7 +279,7 @@ describe('XqTable', () => {
         await wrapper.setProps({
             table: schema({
                 token: 'new',
-                rows: [{ key: '2', cells: { name: { state: 'Mouse' } } }],
+                rows: [{ key: '2', cells: { name: { state: 'Mouse' } }, actions: [] }],
             }),
         });
 
@@ -344,7 +345,7 @@ describe('XqTable', () => {
             columns: [
                 { name: 'rating', type: 'acme/stars', label: 'Rating', sortable: false, props: {} },
             ],
-            rows: [{ key: '1', cells: { rating: { state: 4 } } }],
+            rows: [{ key: '1', cells: { rating: { state: 4 } }, actions: [] }],
         });
         const wrapper = mount(XqTable, {
             props: { table },
@@ -385,7 +386,7 @@ describe('cells', () => {
             columns: [
                 { name: 'a', type, label: 'A', sortable: false, props: columnProps, ...options },
             ],
-            rows: [{ key: '1', cells: { a: { state: null, ...cellProps } } }],
+            rows: [{ key: '1', cells: { a: { state: null, ...cellProps } }, actions: [] }],
         });
 
         return mount(XqTable, { props: { table } }).find('tbody td');
@@ -566,6 +567,107 @@ describe('filters', () => {
         const input = await openFilters(wrapper);
 
         expect(input.value).toBe('draft');
+        wrapper.unmount();
+    });
+});
+
+describe('actions', () => {
+    const action = (name: string, props = {}) => ({
+        name,
+        props: { label: name, style: 'button', hasForm: false, heading: name, ...props },
+    });
+    const rows = [{ key: '7', cells: { name: { state: 'Keyboard' } }, actions: [action('touch')] }];
+
+    function mountTable(table: Partial<TableSchema>) {
+        return mount(XqTable, { props: { table: schema(table) }, attachTo: document.body });
+    }
+
+    it('adds an actions column only when a row has actions', () => {
+        expect(mountTable({ rows }).findAll('th')).toHaveLength(2);
+        expect(mount(XqTable, { props: { table: schema() } }).findAll('th')).toHaveLength(1);
+    });
+
+    it('sends the row and the action, then reloads the rows', async () => {
+        const fetchMock = respondWith({ query: {}, sort: null, activeFilters: 0, rows: [] });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mountTable({ rows, query: { page: 1 } });
+
+        window.history.replaceState(null, '', '/products?products-table[page]=1');
+        await wrapper.find('tbody [data-xq-action] button').trigger('click');
+        await flushPromises();
+
+        expect(fetchMock.mock.calls.map((call) => call[0]).slice(-2)).toEqual([
+            '/action',
+            '/query',
+        ]);
+        expect(JSON.parse(sentBody(fetchMock, fetchMock.mock.calls.length - 2))).toMatchObject({
+            token: 'token',
+            action: 'touch',
+            kind: 'record',
+            record: '7',
+            phase: 'run',
+        });
+        wrapper.unmount();
+    });
+
+    it('sends a header action with no record', async () => {
+        const fetchMock = respondWith({ query: {}, sort: null, activeFilters: 0, rows: [] });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mountTable({ headerActions: [action('export')] });
+
+        await wrapper.find('[data-xq-action] button').trigger('click');
+        await flushPromises();
+
+        const body = JSON.parse(sentBody(fetchMock));
+
+        expect(body).toMatchObject({ action: 'export', kind: 'header', phase: 'run' });
+        expect(body).not.toHaveProperty('record');
+        wrapper.unmount();
+    });
+
+    it('asks first when an action needs confirming', async () => {
+        const fetchMock = respondWith({});
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mountTable({
+            rows: [{ ...rows[0]!, actions: [action('delete', { confirmation: true })] }],
+        });
+
+        await wrapper.find('tbody [data-xq-action] button').trigger('click');
+        await flushPromises();
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(document.body.querySelector('[role="alertdialog"]')).not.toBeNull();
+        wrapper.unmount();
+    });
+
+    it('says so plainly when a row has gone', async () => {
+        vi.stubGlobal('fetch', respondWith({}, 404));
+
+        const wrapper = mountTable({ rows });
+
+        await wrapper.find('tbody [data-xq-action] button').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[role="alert"]').text()).toContain('That action could not run.');
+        wrapper.unmount();
+    });
+
+    it('shows why an action failed and keeps the rows', async () => {
+        vi.stubGlobal('fetch', respondWith({ errors: { 'data.name': ['Not today.'] } }, 422));
+
+        const wrapper = mountTable({ rows });
+
+        await wrapper.find('tbody [data-xq-action] button').trigger('click');
+        await flushPromises();
+
+        expect(wrapper.find('[role="alert"]').text()).toContain('Not today.');
+        expect(wrapper.find('tbody td').text()).toBe('Keyboard');
         wrapper.unmount();
     });
 });

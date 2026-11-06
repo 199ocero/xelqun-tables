@@ -16,9 +16,15 @@ export interface TableCell {
     [key: string]: any;
 }
 
+export interface TableAction {
+    name: string;
+    props: Record<string, any>;
+}
+
 export interface TableRow {
     key: string;
     cells: Record<string, TableCell>;
+    actions: TableAction[];
 }
 
 export interface TablePagination {
@@ -48,7 +54,8 @@ export interface TableSchema extends TableResult {
     pkg: string;
     id: string;
     token: string;
-    endpoints: { query: string };
+    endpoints: { query: string; action: string };
+    headerActions: TableAction[];
     searchable: boolean;
     filters: FormSchema | null;
     filterDefaults: Record<string, unknown>;

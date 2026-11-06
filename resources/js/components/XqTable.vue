@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { cn, useRegistry, XqButton } from '@xelqun/forms';
+import { cn, useRegistry, XqAction, XqButton } from '@xelqun/forms';
+import type { SchemaNode } from '@xelqun/forms';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, watch } from 'vue';
 import { createTableStore } from '../core/store';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
-import type { TableQuery, TableSchema } from '../schema/types';
+import type { TableAction, TableQuery, TableSchema } from '../schema/types';
 import { builtInCells } from './cells';
 import XqCellLink from './XqCellLink.vue';
 import XqTableFilters from './XqTableFilters.vue';
@@ -28,6 +29,26 @@ const columns = computed(() =>
         cell: registry?.get(column.type) ?? builtInCells[column.type],
     })),
 );
+
+const hasRowActions = computed(() => schema.value.rows.some((row) => row.actions.length > 0));
+const hasToolbar = computed(
+    () =>
+        schema.value.searchable ||
+        schema.value.filters !== null ||
+        schema.value.headerActions.length > 0,
+);
+
+/** XqAction reads a form node, and an action's key is its name here. */
+function actionNode(action: TableAction): SchemaNode {
+    return {
+        key: action.name,
+        type: 'action',
+        hidden: false,
+        props: action.props,
+        children: [],
+        deps: [],
+    };
+}
 
 function sortDirection(name: string): 'asc' | 'desc' | null {
     const { sort } = schema.value;
@@ -94,26 +115,29 @@ onMounted(() => {
                 {{ t('Retry') }}
             </XqButton>
         </div>
-        <div
-            v-if="schema.searchable || schema.filters"
-            class="gap-3 flex items-center justify-between"
-        >
+        <div v-if="hasToolbar" class="gap-3 flex flex-wrap items-center">
             <XqTableSearch
                 v-if="schema.searchable"
                 :value="schema.query.search ?? ''"
                 :t="t"
                 @search="store.update({ search: $event, page: 1 })"
             />
+            <div class="ml-auto"></div>
             <XqTableFilters
                 v-if="schema.filters"
                 :key="schema.filters.token ?? undefined"
-                class="ml-auto"
                 :form="schema.filters"
                 :defaults="schema.filterDefaults"
                 :values="schema.query.filters"
                 :active="schema.activeFilters"
                 :t="t"
                 @apply="store.update({ filters: $event, page: 1 })"
+            />
+            <XqAction
+                v-for="action in schema.headerActions"
+                :key="action.name"
+                :node="actionNode(action)"
+                :runner="store.actionRunner({ kind: 'header' })"
             />
         </div>
         <div
@@ -159,6 +183,9 @@ onMounted(() => {
                             </button>
                             <template v-else>{{ column.label }}</template>
                         </th>
+                        <th v-if="hasRowActions" scope="col">
+                            <span class="sr-only">{{ t('Actions') }}</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -183,10 +210,22 @@ onMounted(() => {
                                 {{ t('Unknown column type: :type', { type: column.type }) }}
                             </span>
                         </td>
+                        <td v-if="hasRowActions" class="px-3 py-2">
+                            <div class="gap-1 flex justify-end">
+                                <XqAction
+                                    v-for="action in row.actions"
+                                    :key="action.name"
+                                    :node="actionNode(action)"
+                                    :runner="
+                                        store.actionRunner({ kind: 'record', record: row.key })
+                                    "
+                                />
+                            </div>
+                        </td>
                     </tr>
                     <tr v-if="schema.rows.length === 0">
                         <td
-                            :colspan="columns.length"
+                            :colspan="columns.length + (hasRowActions ? 1 : 0)"
                             class="px-3 py-8 text-xq-muted-foreground text-center"
                         >
                             {{ t('No records found.') }}

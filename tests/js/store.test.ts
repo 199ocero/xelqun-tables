@@ -11,7 +11,8 @@ function schema(): TableSchema {
         pkg: '0.1.0',
         id: 'orders',
         token: 'token',
-        endpoints: { query: '/query' },
+        endpoints: { query: '/query', action: '/action' },
+        headerActions: [],
         searchable: false,
         filters: null,
         filterDefaults: {},
@@ -165,7 +166,7 @@ describe('table store', () => {
 
         const store = createTableStore({
             ...schema(),
-            rows: [{ key: '1', cells: {} }],
+            rows: [{ key: '1', cells: {}, actions: [] }],
         });
 
         await store.update({ page: 2 });
