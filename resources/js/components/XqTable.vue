@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { cn, useRegistry, XqAction, XqButton } from '@xelqun/forms';
+import { cn, useRegistry, XqAction, XqButton, XqCheckbox } from '@xelqun/forms';
 import type { SchemaNode } from '@xelqun/forms';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
@@ -11,6 +11,7 @@ import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
 import type { TableAction, TableQuery, TableSchema } from '../schema/types';
 import { builtInCells } from './cells';
 import XqCellLink from './XqCellLink.vue';
+import XqTableBulkBar from './XqTableBulkBar.vue';
 import XqTableFilters from './XqTableFilters.vue';
 import XqTablePagination from './XqTablePagination.vue';
 import XqTableSearch from './XqTableSearch.vue';
@@ -19,7 +20,7 @@ const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] 
 
 const registry = useRegistry();
 const store = createTableStore(props.table, { onChange: syncUrl });
-const { schema, loading, error, t } = store;
+const { schema, loading, error, selected, t } = store;
 const isSupported = computed(() =>
     (SUPPORTED_SCHEMA_VERSIONS as readonly number[]).includes(schema.value.$xq),
 );
@@ -31,6 +32,10 @@ const columns = computed(() =>
 );
 
 const hasRowActions = computed(() => schema.value.rows.some((row) => row.actions.length > 0));
+const hasSelection = computed(() => schema.value.bulkActions.length > 0);
+const selectedOnPage = computed(
+    () => schema.value.rows.filter((row) => selected.value.has(row.key)).length,
+);
 const hasToolbar = computed(
     () =>
         schema.value.searchable ||
@@ -140,6 +145,22 @@ onMounted(() => {
                 :runner="store.actionRunner({ kind: 'header' })"
             />
         </div>
+        <XqTableBulkBar
+            v-if="selected.size > 0"
+            :count="selected.size"
+            :total="schema.pagination.total"
+            :max="schema.maxSelectable"
+            :t="t"
+            @select-all="store.selectAll()"
+            @clear="store.clearSelection()"
+        >
+            <XqAction
+                v-for="action in schema.bulkActions"
+                :key="action.name"
+                :node="actionNode(action)"
+                :runner="store.actionRunner({ kind: 'bulk' })"
+            />
+        </XqTableBulkBar>
         <div
             :class="
                 cn(
@@ -151,6 +172,18 @@ onMounted(() => {
             <table class="text-sm w-full">
                 <thead class="border-xq-border bg-xq-muted/50 border-b">
                     <tr>
+                        <th v-if="hasSelection" scope="col" class="px-3 py-2 w-px">
+                            <XqCheckbox
+                                :model-value="
+                                    selectedOnPage > 0 && selectedOnPage === schema.rows.length
+                                "
+                                :indeterminate="
+                                    selectedOnPage > 0 && selectedOnPage < schema.rows.length
+                                "
+                                :aria-label="t('Select all on this page')"
+                                @update:model-value="store.togglePage($event)"
+                            />
+                        </th>
                         <th
                             v-for="column in columns"
                             :key="column.name"
@@ -194,6 +227,13 @@ onMounted(() => {
                         :key="row.key"
                         class="border-xq-border border-b last:border-b-0"
                     >
+                        <td v-if="hasSelection" class="px-3 py-2">
+                            <XqCheckbox
+                                :model-value="selected.has(row.key)"
+                                :aria-label="t('Select row')"
+                                @update:model-value="store.toggleRow(row.key, $event)"
+                            />
+                        </td>
                         <td v-for="column in columns" :key="column.name" class="px-3 py-2">
                             <XqCellLink
                                 v-if="column.cell"
@@ -225,7 +265,9 @@ onMounted(() => {
                     </tr>
                     <tr v-if="schema.rows.length === 0">
                         <td
-                            :colspan="columns.length + (hasRowActions ? 1 : 0)"
+                            :colspan="
+                                columns.length + (hasRowActions ? 1 : 0) + (hasSelection ? 1 : 0)
+                            "
                             class="px-3 py-8 text-xq-muted-foreground text-center"
                         >
                             {{ t('No records found.') }}

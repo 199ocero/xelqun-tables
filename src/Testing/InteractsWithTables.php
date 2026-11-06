@@ -48,6 +48,25 @@ trait InteractsWithTables
     }
 
     /**
+     * Run an action on selected rows.
+     *
+     * @param  array<int, int|string>  $records  The rows' keys.
+     * @param  array<string, mixed>|null  $data  The modal's values.
+     * @return TestResponse<Response>
+     */
+    public function runBulkTableAction(Table $table, string $name, array $records, ?array $data = null): TestResponse
+    {
+        return $this->postJson(route('xelqun.tables.action'), [
+            'token' => $table->makeToken(),
+            'action' => $name,
+            'kind' => 'bulk',
+            'records' => array_map(strval(...), $records),
+            'phase' => 'run',
+            'data' => $data,
+        ]);
+    }
+
+    /**
      * @param  array<string, mixed>|null  $data
      * @return TestResponse<Response>
      */

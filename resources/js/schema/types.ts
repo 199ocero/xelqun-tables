@@ -56,6 +56,8 @@ export interface TableSchema extends TableResult {
     token: string;
     endpoints: { query: string; action: string };
     headerActions: TableAction[];
+    bulkActions: TableAction[];
+    maxSelectable: number;
     searchable: boolean;
     filters: FormSchema | null;
     filterDefaults: Record<string, unknown>;

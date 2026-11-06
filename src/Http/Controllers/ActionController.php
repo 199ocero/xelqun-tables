@@ -20,18 +20,25 @@ class ActionController
         $validated = $request->validate([
             'token' => ['required', 'string'],
             'action' => ['required', 'string', 'max:255'],
-            'kind' => ['required', Rule::in([TableActionHost::RECORD, TableActionHost::HEADER])],
+            'kind' => ['required', Rule::in([TableActionHost::RECORD, TableActionHost::HEADER, TableActionHost::BULK])],
             'phase' => ['required', 'in:mount,run'],
             'record' => ['required_if:kind,'.TableActionHost::RECORD, 'nullable', 'string', 'max:255'],
+            'records' => ['required_if:kind,'.TableActionHost::BULK, 'array'],
             'data' => ['nullable', 'array'],
         ]);
 
         $table = $tokens->resolveTable($validated['token']);
+        $isBulk = $validated['kind'] === TableActionHost::BULK;
+        $selection = $isBulk ? array_values($validated['records']) : [];
+
+        abort_if(count($selection) > $table->getMaxSelectableRecords(), 422, 'Too many rows selected.');
+
         $record = $validated['kind'] === TableActionHost::RECORD ? $table->resolveRecord($validated['record']) : null;
-        $host = TableActionHost::for($table, $validated['kind'], $record);
+        $host = TableActionHost::for($table, $validated['kind'], $record, $selection);
         $action = $host->findAction($validated['action']);
 
         abort_if($action === null, 404);
+        abort_if($isBulk && $host->getSelectedRecords()->isEmpty(), 404);
         abort_unless($action->canRun(), 403);
 
         if ($validated['phase'] === 'mount') {

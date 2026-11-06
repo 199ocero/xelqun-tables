@@ -13,6 +13,8 @@ function schema(): TableSchema {
         token: 'token',
         endpoints: { query: '/query', action: '/action' },
         headerActions: [],
+        bulkActions: [],
+        maxSelectable: 1000,
         searchable: false,
         filters: null,
         filterDefaults: {},
@@ -142,6 +144,148 @@ describe('table store', () => {
         expect(store.error.value).toBeNull();
         expect(store.loading.value).toBe(false);
         expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('keeps the selection across pages and sorting', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => response(result(2))),
+        );
+
+        const store = createTableStore(schema());
+
+        store.toggleRow('1', true);
+        await store.update({ page: 2 });
+        await store.update({ sort: 'name', page: 1 });
+        await store.update({ per_page: 25 });
+
+        expect([...store.selected.value]).toEqual(['1']);
+    });
+
+    it.each(['search', 'filters'])('clears the selection when %s changes', async (key) => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => response(result(1))),
+        );
+
+        const store = createTableStore(schema());
+
+        store.toggleRow('1', true);
+        await store.update({ [key]: 'x' });
+
+        expect(store.selected.value.size).toBe(0);
+    });
+
+    it('clears the selection on a new visit', () => {
+        const store = createTableStore(schema());
+
+        store.toggleRow('1', true);
+        store.reset(schema());
+
+        expect(store.selected.value.size).toBe(0);
+    });
+
+    it('selects a page and removes it again, keeping other pages', () => {
+        const store = createTableStore({
+            ...schema(),
+            rows: [
+                { key: '1', cells: {}, actions: [] },
+                { key: '2', cells: {}, actions: [] },
+            ],
+        });
+
+        store.toggleRow('9', true);
+        store.togglePage(true);
+
+        expect([...store.selected.value]).toEqual(['9', '1', '2']);
+
+        store.togglePage(false);
+
+        expect([...store.selected.value]).toEqual(['9']);
+    });
+
+    it('selects every row the server lists', async () => {
+        const fetchMock = vi.fn(async () => response({ keys: ['1', '2', '3'] }));
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const store = createTableStore({ ...schema(), query: { search: 'a' } });
+
+        await store.selectAll();
+
+        expect(JSON.parse((fetchMock.mock.calls[0] as any[])[1].body)).toMatchObject({
+            keys: true,
+            query: { search: 'a' },
+        });
+        expect(store.selected.value.size).toBe(3);
+    });
+
+    it('drops a select all that a newer search overtook', async () => {
+        const held = holdRequests();
+        const store = createTableStore(schema());
+        const selecting = store.selectAll();
+
+        void store.update({ search: 'other' });
+        held[0]!.answer(response({ keys: ['1', '2'] }));
+        await selecting;
+
+        expect(store.selected.value.size).toBe(0);
+    });
+
+    it('sends the selection with a bulk action, then clears it', async () => {
+        const fetchMock = vi.fn(async (url: string) =>
+            response(url === '/action' ? {} : result(1)),
+        );
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const store = createTableStore(schema());
+
+        store.toggleRow('1', true);
+        store.toggleRow('2', true);
+
+        const node = {
+            key: 'remove',
+            type: 'action',
+            hidden: false,
+            props: {},
+            children: [],
+            deps: [],
+        };
+
+        await store.actionRunner({ kind: 'bulk' }).runAction(node as any);
+
+        expect(JSON.parse((fetchMock.mock.calls[0] as any[])[1].body)).toMatchObject({
+            action: 'remove',
+            kind: 'bulk',
+            records: ['1', '2'],
+        });
+        expect(store.selected.value.size).toBe(0);
+    });
+
+    it('keeps the selection when a bulk action fails', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => response({}, 403)),
+        );
+
+        const store = createTableStore(schema());
+
+        store.toggleRow('1', true);
+
+        const node = {
+            key: 'remove',
+            type: 'action',
+            hidden: false,
+            props: {},
+            children: [],
+            deps: [],
+        };
+
+        await store.actionRunner({ kind: 'bulk' }).runAction(node as any);
+
+        expect(store.selected.value.size).toBe(1);
+        expect(store.error.value).toBe('That action could not run.');
     });
 
     it('says an old page has expired', async () => {

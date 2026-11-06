@@ -17,12 +17,16 @@ export interface TableStoreOptions {
 export type TableStore = ReturnType<typeof createTableStore>;
 
 /** What an action works on. The server finds the record again by itself. */
-export type ActionTarget = { kind: 'record'; record: string } | { kind: 'header' };
+export type ActionTarget =
+    | { kind: 'record'; record: string }
+    | { kind: 'header' }
+    | { kind: 'bulk' };
 
 export function createTableStore(initial: TableSchema, options: TableStoreOptions = {}) {
     const schema = shallowRef(initial);
     const loading = ref(false);
     const error = ref<string | null>(null);
+    const selected = ref(new Set<string>());
 
     let sequence = 0;
     let request: AbortController | null = null;
@@ -84,7 +88,58 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
      * a change made during a request must not undo that request.
      */
     function update(changes: TableQuery): Promise<void> {
+        // Otherwise a bulk action could reach rows the viewer can no longer see.
+        if ('search' in changes || 'filters' in changes) {
+            clearSelection();
+        }
+
         return load({ ...lastQuery, ...changes });
+    }
+
+    function clearSelection(): void {
+        selected.value = new Set();
+    }
+
+    function toggleRow(key: string, isSelected: boolean): void {
+        const next = new Set(selected.value);
+
+        if (isSelected) {
+            next.add(key);
+        } else {
+            next.delete(key);
+        }
+
+        selected.value = next;
+    }
+
+    function togglePage(isSelected: boolean): void {
+        const next = new Set(selected.value);
+
+        schema.value.rows.forEach((row) => (isSelected ? next.add(row.key) : next.delete(row.key)));
+        selected.value = next;
+    }
+
+    /**
+     * Select every row of the current search and filters. Ids come from the
+     * server, so nothing is selected that this page never reached.
+     */
+    async function selectAll(): Promise<void> {
+        const mine = sequence;
+
+        try {
+            const { keys } = await postJson<{ keys: string[] }>(schema.value.endpoints.query, {
+                token: schema.value.token,
+                query: lastQuery,
+                keys: true,
+            });
+
+            // The search may have changed, and these rows would be out of sight.
+            if (mine === sequence) {
+                selected.value = new Set(keys);
+            }
+        } catch (failure) {
+            error.value = failureMessage(failure, 'Could not load the records.');
+        }
     }
 
     function retry(): Promise<void> {
@@ -103,6 +158,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                 phase,
                 data,
                 ...target,
+                ...(target.kind === 'bulk' ? { records: [...selected.value] } : {}),
             });
         const report = (failure: unknown, modal?: ActionModal) => {
             if (modal) {
@@ -141,6 +197,10 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                 try {
                     const response = await send<ActionResult>(node, 'run', modal?.state.data);
 
+                    if (target.kind === 'bulk') {
+                        clearSelection();
+                    }
+
                     void load(lastQuery);
 
                     return response;
@@ -170,7 +230,24 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         schema.value = next;
         lastQuery = next.query;
         error.value = null;
+        clearSelection();
     }
 
-    return { schema, loading, error, t, load, update, retry, reset, dispose, actionRunner };
+    return {
+        schema,
+        loading,
+        error,
+        selected,
+        t,
+        load,
+        update,
+        retry,
+        reset,
+        dispose,
+        actionRunner,
+        clearSelection,
+        toggleRow,
+        togglePage,
+        selectAll,
+    };
 }

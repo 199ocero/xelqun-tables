@@ -4,12 +4,14 @@ namespace Xelqun\Tables;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Xelqun\Forms\Actions\Action;
 use Xelqun\Forms\Security\FormToken;
 use Xelqun\Forms\Security\FormTokenEncrypter;
+use Xelqun\Tables\Actions\BulkAction;
 use Xelqun\Tables\Actions\TableActionHost;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
@@ -35,6 +37,8 @@ abstract class Table
     private array $paginationPageOptions = [10, 25, 50];
 
     private ?string $defaultSort = null;
+
+    private int $maxSelectableRecords = 1000;
 
     /** @var array<int, Column>|null */
     private ?array $mountedColumns = null;
@@ -110,6 +114,16 @@ abstract class Table
         return [];
     }
 
+    /**
+     * Buttons for the selected rows, which reach their closures as $records.
+     *
+     * @return array<int, BulkAction>
+     */
+    public function bulkActions(): array
+    {
+        return [];
+    }
+
     public function authorize(?Authenticatable $user): bool
     {
         return true;
@@ -177,6 +191,43 @@ abstract class Table
     }
 
     /**
+     * Find rows, staying inside query(). A key that isn't there is skipped,
+     * because another viewer may have removed that row.
+     *
+     * @param  array<int, mixed>  $keys
+     * @return Collection<int, Model>
+     */
+    public function resolveRecords(array $keys): Collection
+    {
+        $query = $this->query();
+        $model = $query->getModel();
+        $keys = array_values(array_unique(array_filter(
+            $keys,
+            fn (mixed $key): bool => is_scalar($key) && ($model->getKeyType() !== 'int' || ctype_digit((string) $key)),
+        )));
+
+        return $query
+            ->withGlobalScope('xelqun-records', fn (Builder $scoped): Builder => $scoped->whereKey($keys))
+            ->get();
+    }
+
+    /**
+     * The keys of every row in the current search and filters, for "select all".
+     * It stops at one past the limit, so the answer can say it was too many.
+     *
+     * @internal
+     *
+     * @return array<int, string>|null Null when there are more than the limit.
+     */
+    public function getSelectableKeys(TableState $state): ?array
+    {
+        $query = $this->buildQuery($state);
+        $keys = $query->limit($this->maxSelectableRecords + 1)->pluck($query->getModel()->getQualifiedKeyName());
+
+        return $keys->count() > $this->maxSelectableRecords ? null : $keys->map(strval(...))->all();
+    }
+
+    /**
      * Name this table when a page shows the same class twice.
      */
     public function id(string $id): static
@@ -240,6 +291,21 @@ abstract class Table
     }
 
     /**
+     * The most rows one bulk action can take. The server enforces it.
+     */
+    public function maxSelectableRecords(int $count): static
+    {
+        $this->maxSelectableRecords = $count;
+
+        return $this;
+    }
+
+    public function getMaxSelectableRecords(): int
+    {
+        return $this->maxSelectableRecords;
+    }
+
+    /**
      * The columns the viewer may see. A hidden one is left out of everything,
      * search and sorting included, so a viewer can't work out its values.
      *
@@ -296,6 +362,8 @@ abstract class Table
             ...$this->getClientMessages(),
             'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $this->getColumns()),
             'headerActions' => TableActionHost::for($this, TableActionHost::HEADER)->toActionNodes(),
+            'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
+            'maxSelectable' => $this->maxSelectableRecords,
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),
             ...$result,

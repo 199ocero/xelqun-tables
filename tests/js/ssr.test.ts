@@ -17,6 +17,8 @@ const table: TableSchema = {
     token: 'token',
     endpoints: { query: '/query', action: '/action' },
     headerActions: [],
+    bulkActions: [],
+    maxSelectable: 1000,
     searchable: true,
     filters: null,
     filterDefaults: {},

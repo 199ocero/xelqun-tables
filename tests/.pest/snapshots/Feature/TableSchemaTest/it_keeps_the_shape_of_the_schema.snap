@@ -31,6 +31,8 @@
         }
     ],
     "headerActions": [],
+    "bulkActions": [],
+    "maxSelectable": 1000,
     "filters": null,
     "filterDefaults": {},
     "query": {},

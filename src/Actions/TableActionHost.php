@@ -3,6 +3,7 @@
 namespace Xelqun\Tables\Actions;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Xelqun\Forms\Actions\Action;
@@ -27,17 +28,26 @@ final class TableActionHost extends Form
 
     public const string HEADER = 'header';
 
+    public const string BULK = 'bulk';
+
     private ?Table $table = null;
+
+    /** @var Collection<int, Model>|null */
+    private ?Collection $selectedRecords = null;
 
     private bool $hasFilledInModels = false;
 
-    public static function for(Table $table, string $kind, ?Model $record = null): self
+    /**
+     * @param  array<int, string>  $selection  The keys of a bulk action's rows.
+     */
+    public static function for(Table $table, string $kind, ?Model $record = null, array $selection = []): self
     {
         return self::make($record, [
             'table' => $table::class,
             'tableContext' => $table->getContext(),
             'tableId' => $table->getId(),
             'kind' => $kind,
+            'selection' => $selection,
         ]);
     }
 
@@ -46,6 +56,7 @@ final class TableActionHost extends Form
         $actions = match ($this->context['kind']) {
             self::RECORD => $this->getTable()->recordActions(),
             self::HEADER => $this->getTable()->headerActions(),
+            self::BULK => $this->getTable()->bulkActions(),
             default => [],
         };
         $names = array_map(fn (Action $action): string => $action->getName(), $actions);
@@ -75,6 +86,17 @@ final class TableActionHost extends Form
         }
 
         return $components;
+    }
+
+    /**
+     * The selection, found again on every request. It travels in a modal's
+     * token, and a row in it may have left the table since.
+     *
+     * @return Collection<int, Model>
+     */
+    public function getSelectedRecords(): Collection
+    {
+        return $this->selectedRecords ??= $this->getTable()->resolveRecords((array) ($this->context['selection'] ?? []));
     }
 
     /**

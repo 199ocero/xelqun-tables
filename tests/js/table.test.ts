@@ -22,6 +22,8 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         token: 'token',
         endpoints: { query: '/query', action: '/action' },
         headerActions: [],
+        bulkActions: [],
+        maxSelectable: 1000,
         searchable: false,
         filters: null,
         filterDefaults: {},
@@ -669,5 +671,81 @@ describe('actions', () => {
         expect(wrapper.find('[role="alert"]').text()).toContain('Not today.');
         expect(wrapper.find('tbody td').text()).toBe('Keyboard');
         wrapper.unmount();
+    });
+});
+
+describe('selection', () => {
+    const bulk = [
+        { name: 'remove', props: { label: 'Remove', style: 'button', heading: 'Remove' } },
+    ];
+    const rows = [
+        { key: '1', cells: { name: { state: 'One' } }, actions: [] },
+        { key: '2', cells: { name: { state: 'Two' } }, actions: [] },
+    ];
+    const table = (extra: Partial<TableSchema> = {}) =>
+        schema({
+            bulkActions: bulk,
+            rows,
+            pagination: { page: 1, perPage: 2, total: 5, lastPage: 3, options: [2] },
+            ...extra,
+        });
+
+    it('shows checkboxes only with bulk actions', () => {
+        expect(
+            mount(XqTable, { props: { table: schema({ rows }) } })
+                .find('tbody [role="checkbox"]')
+                .exists(),
+        ).toBe(false);
+        expect(
+            mount(XqTable, { props: { table: table() } }).findAll('tbody [role="checkbox"]'),
+        ).toHaveLength(2);
+    });
+
+    it('shows the bar and a mixed header while part of the page is selected', async () => {
+        const wrapper = mount(XqTable, { props: { table: table() } });
+
+        expect(wrapper.find('[data-xq-table-bulk]').exists()).toBe(false);
+
+        await wrapper.findAll('tbody [role="checkbox"]')[0]!.trigger('click');
+
+        expect(wrapper.find('[data-xq-table-bulk]').text()).toContain('1 selected');
+        expect(wrapper.find('th [role="checkbox"]').attributes('aria-checked')).toBe('mixed');
+    });
+
+    it('selects the page from the header', async () => {
+        const wrapper = mount(XqTable, { props: { table: table() } });
+
+        await wrapper.find('th [role="checkbox"]').trigger('click');
+
+        expect(wrapper.find('[data-xq-table-bulk]').text()).toContain('2 selected');
+        expect(wrapper.find('th [role="checkbox"]').attributes('aria-checked')).toBe('true');
+    });
+
+    it('offers select all only within the limit', async () => {
+        const within = mount(XqTable, { props: { table: table() } });
+
+        await within.find('th [role="checkbox"]').trigger('click');
+
+        expect(within.find('[data-xq-table-bulk]').text()).toContain('Select all 5');
+
+        const over = mount(XqTable, { props: { table: table({ maxSelectable: 4 }) } });
+
+        await over.find('th [role="checkbox"]').trigger('click');
+
+        expect(over.find('[data-xq-table-bulk]').text()).not.toContain('Select all');
+    });
+
+    it('clears from the bar', async () => {
+        const wrapper = mount(XqTable, { props: { table: table() } });
+
+        await wrapper.find('th [role="checkbox"]').trigger('click');
+
+        const clear = wrapper
+            .findAll('[data-xq-table-bulk] button')
+            .find((button) => button.text() === 'Clear selection')!;
+
+        await clear.trigger('click');
+
+        expect(wrapper.find('[data-xq-table-bulk]').exists()).toBe(false);
     });
 });
