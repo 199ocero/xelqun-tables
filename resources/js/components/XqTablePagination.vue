@@ -10,8 +10,12 @@ const emit = defineEmits<{ page: [page: number]; perPage: [perPage: number] }>()
 
 const range = computed(() => ({
     from: (props.pagination.page - 1) * props.pagination.perPage + 1,
-    to: Math.min(props.pagination.page * props.pagination.perPage, props.pagination.total),
+    until: Math.min(props.pagination.page * props.pagination.perPage, props.pagination.total),
     total: props.pagination.total,
+}));
+const position = computed(() => ({
+    current: props.pagination.page,
+    last: props.pagination.lastPage,
 }));
 const pageSizes = computed(() =>
     props.pagination.options.map((option) => ({ value: String(option), label: String(option) })),
@@ -24,12 +28,10 @@ function changePerPage(value: string | number | null | undefined): void {
 
 <template>
     <nav
-        :aria-label="
-            t('Page :page of :pages', { page: pagination.page, pages: pagination.lastPage })
-        "
+        :aria-label="t('Page :current of :last', position)"
         class="gap-3 text-sm text-xq-muted-foreground flex flex-wrap items-center justify-between"
     >
-        <p aria-live="polite">{{ t('Showing :from to :to of :total', range) }}</p>
+        <p aria-live="polite">{{ t('Showing :from to :until of :total', range) }}</p>
         <div class="gap-4 flex flex-wrap items-center">
             <label v-if="pageSizes.length > 1" class="gap-2 flex items-center">
                 {{ t('Per page') }}
@@ -51,9 +53,7 @@ function changePerPage(value: string | number | null | undefined): void {
                 >
                     <ChevronLeft />
                 </XqButton>
-                <span>{{
-                    t('Page :page of :pages', { page: pagination.page, pages: pagination.lastPage })
-                }}</span>
+                <span>{{ t('Page :current of :last', position) }}</span>
                 <XqButton
                     type="button"
                     variant="outline"

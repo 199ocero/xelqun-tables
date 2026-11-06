@@ -1,0 +1,19 @@
+{
+    "column": [
+        {
+            "name": "name",
+            "type": "acme\/thing",
+            "label": "Name",
+            "sortable": false,
+            "props": {}
+        }
+    ],
+    "cell": {
+        "name": {
+            "state": "Keyboard",
+            "props": {
+                "a": 1
+            }
+        }
+    }
+}

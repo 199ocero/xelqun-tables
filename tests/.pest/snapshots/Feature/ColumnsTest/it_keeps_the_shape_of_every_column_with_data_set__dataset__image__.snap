@@ -1,0 +1,20 @@
+{
+    "column": [
+        {
+            "name": "secret",
+            "type": "image-column",
+            "label": "Secret",
+            "sortable": false,
+            "props": {
+                "size": 32,
+                "circular": true
+            }
+        }
+    ],
+    "cell": {
+        "secret": {
+            "state": null,
+            "alt": "Photo"
+        }
+    }
+}

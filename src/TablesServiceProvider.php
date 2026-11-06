@@ -3,6 +3,7 @@
 namespace Xelqun\Tables;
 
 use Illuminate\Support\ServiceProvider;
+use Xelqun\Tables\Commands\MakeColumnCommand;
 
 class TablesServiceProvider extends ServiceProvider
 {
@@ -24,6 +25,8 @@ class TablesServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../resources/lang' => lang_path('vendor/xelqun-tables'),
             ], 'xelqun-tables-lang');
+
+            $this->commands([MakeColumnCommand::class]);
         }
     }
 }

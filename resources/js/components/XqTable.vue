@@ -9,6 +9,7 @@ import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
 import type { TableQuery, TableSchema } from '../schema/types';
 import { builtInCells } from './cells';
+import XqCellLink from './XqCellLink.vue';
 import XqTablePagination from './XqTablePagination.vue';
 import XqTableSearch from './XqTableSearch.vue';
 
@@ -150,12 +151,17 @@ onMounted(() => {
                         class="border-xq-border border-b last:border-b-0"
                     >
                         <td v-for="column in columns" :key="column.name" class="px-3 py-2">
-                            <component
-                                :is="column.cell"
+                            <XqCellLink
                                 v-if="column.cell"
-                                :column="column"
-                                :cell="row.cells[column.name]"
-                            />
+                                :url="row.cells[column.name].url"
+                                :new-tab="column.opensInNewTab"
+                            >
+                                <component
+                                    :is="column.cell"
+                                    :column="column"
+                                    :cell="row.cells[column.name]"
+                                />
+                            </XqCellLink>
                             <span v-else class="text-xq-destructive">
                                 {{ t('Unknown column type: :type', { type: column.type }) }}
                             </span>

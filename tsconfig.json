@@ -12,7 +12,10 @@
         "resolveJsonModule": true,
         "jsx": "preserve",
         "types": ["vite/client"],
-        "noEmit": true
+        "noEmit": true,
+        "paths": {
+            "@xelqun/tables": ["./resources/js/index.ts"]
+        }
     },
-    "include": ["resources/js/**/*.ts", "resources/js/**/*.vue", "tests/js/**/*.ts"]
+    "include": ["resources/js/**/*.ts", "resources/js/**/*.vue", "stubs/*.vue", "tests/js/**/*.ts"]
 }

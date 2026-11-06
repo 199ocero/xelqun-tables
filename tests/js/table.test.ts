@@ -8,7 +8,10 @@ import type { TableSchema } from '../../resources/js/schema/types';
 
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 
-vi.mock('@inertiajs/vue3', () => ({ router: { replace } }));
+vi.mock('@inertiajs/vue3', () => ({
+    router: { replace },
+    Link: { props: ['href'], template: '<a data-inertia-link :href="href"><slot /></a>' },
+}));
 
 function schema(overrides: Partial<TableSchema> = {}): TableSchema {
     return {
@@ -199,6 +202,14 @@ describe('XqTable', () => {
         vi.useRealTimers();
     });
 
+    it('says where the viewer is', () => {
+        const pagination = { page: 2, perPage: 10, total: 25, lastPage: 3, options: [10] };
+        const wrapper = mount(XqTable, { props: { table: schema({ pagination }) } });
+
+        expect(wrapper.text()).toContain('Showing 11 to 20 of 25');
+        expect(wrapper.text()).toContain('Page 2 of 3');
+    });
+
     it('turns off the buttons at the ends', () => {
         const wrapper = mount(XqTable, { props: { table: schema({ pagination: paged }) } });
 
@@ -361,5 +372,101 @@ describe('XqTable', () => {
 
         expect(wrapper.find('table').exists()).toBe(false);
         expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+});
+
+describe('cells', () => {
+    function cell(type: string, cellProps: Record<string, any>, columnProps = {}, options = {}) {
+        const table = schema({
+            columns: [
+                { name: 'a', type, label: 'A', sortable: false, props: columnProps, ...options },
+            ],
+            rows: [{ key: '1', cells: { a: { state: null, ...cellProps } } }],
+        });
+
+        return mount(XqTable, { props: { table } }).find('tbody td');
+    }
+
+    it('joins a list in a text cell', () => {
+        expect(cell('text-column', { state: ['a', 'b'] }).text()).toBe('a, b');
+    });
+
+    it('shows a pill for each value, in its color', () => {
+        const pills = cell(
+            'text-column',
+            { state: ['a', 'b'], color: 'success' },
+            { badge: true },
+        ).findAll('[data-slot="xq-badge"]');
+
+        expect(pills).toHaveLength(2);
+        expect(pills[0]!.classes()).toContain('text-xq-success');
+    });
+
+    it('shows no pill for an empty value', () => {
+        expect(
+            cell('text-column', {}, { badge: true }).find('[data-slot="xq-badge"]').exists(),
+        ).toBe(false);
+    });
+
+    it('gives an icon a name screen readers can read', () => {
+        const icon = cell('icon-column', { icon: 'check', color: 'success', label: 'Yes' });
+
+        expect(icon.find('.sr-only').text()).toBe('Yes');
+        expect(icon.find('svg').exists()).toBe(true);
+    });
+
+    it('sizes an image and describes it', () => {
+        const image = cell(
+            'image-column',
+            { state: '/a.png', alt: 'Photo' },
+            { size: 32, circular: true },
+        ).find('img');
+
+        expect(image.attributes('alt')).toBe('Photo');
+        expect(image.attributes('width')).toBe('32');
+        expect(image.classes()).toContain('rounded-full');
+    });
+
+    it('shows no broken image for an empty state', () => {
+        expect(cell('image-column', {}, { size: 32 }).find('img').exists()).toBe(false);
+    });
+
+    it('links a cell, with an Inertia visit on this site', () => {
+        expect(
+            cell('text-column', { state: 'a', url: '/a' })
+                .find('[data-inertia-link]')
+                .attributes('href'),
+        ).toBe('/a');
+    });
+
+    it('uses a plain link for another site or a new tab', () => {
+        const external = cell('text-column', { state: 'a', url: 'https://example.com/a' }).find(
+            'a',
+        );
+
+        expect(external.attributes('data-inertia-link')).toBeUndefined();
+
+        const newTab = cell(
+            'text-column',
+            { state: 'a', url: '/a' },
+            {},
+            { opensInNewTab: true },
+        ).find('a');
+
+        expect(newTab.attributes('target')).toBe('_blank');
+        expect(newTab.attributes('rel')).toBe('noopener noreferrer');
+    });
+
+    it('keeps repeated images apart', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        cell('image-column', { state: ['/a.png', '/a.png'], alt: 'A' }, { size: 32 });
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it('adds no link to a cell without a url', () => {
+        expect(cell('text-column', { state: 'a' }).find('a').exists()).toBe(false);
     });
 });

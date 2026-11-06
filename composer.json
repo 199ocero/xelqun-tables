@@ -19,6 +19,7 @@
     ],
     "require": {
         "php": "^8.4",
+        "ext-intl": "*",
         "illuminate/contracts": "^13.0",
         "illuminate/database": "^13.0",
         "illuminate/http": "^13.0",

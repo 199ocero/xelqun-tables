@@ -1,0 +1,16 @@
+{
+    "column": [
+        {
+            "name": "name",
+            "type": "text-column",
+            "label": "Name",
+            "sortable": false,
+            "props": {}
+        }
+    ],
+    "cell": {
+        "name": {
+            "state": "Keyboard"
+        }
+    }
+}

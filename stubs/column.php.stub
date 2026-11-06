@@ -1,0 +1,35 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use Xelqun\Tables\Columns\Column;
+
+class {{ class }} extends Column
+{
+    public function getType(): string
+    {
+        return '{{ type }}';
+    }
+
+    /**
+     * Data for the whole column, available as column.props.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getProps(): array
+    {
+        return [];
+    }
+
+    /**
+     * Data for one cell, beside its state. It goes to the browser, so send only
+     * what the cell shows.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getCellProps(Model $record, mixed $state): array
+    {
+        return [];
+    }
+}

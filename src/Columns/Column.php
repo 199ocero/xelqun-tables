@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Traits\Macroable;
+use Xelqun\Forms\Support\SafeUrl;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Table;
 
@@ -35,6 +36,16 @@ abstract class Column
     protected bool|Closure $hidden = false;
 
     protected ?Closure $stateUsing = null;
+
+    protected ?Closure $formatStateUsing = null;
+
+    protected string|Closure|null $color = null;
+
+    protected string|Closure|null $icon = null;
+
+    protected string|Closure|null $url = null;
+
+    protected bool $opensUrlInNewTab = false;
 
     protected bool $isSortable = false;
 
@@ -148,6 +159,48 @@ abstract class Column
     public function state(?Closure $using): static
     {
         $this->stateUsing = $using;
+
+        return $this;
+    }
+
+    /**
+     * Change the value for display. Sorting and search still use the original.
+     * It receives $state and $record, once for each value of a list.
+     */
+    public function formatStateUsing(?Closure $using): static
+    {
+        $this->formatStateUsing = $using;
+
+        return $this;
+    }
+
+    /**
+     * gray, primary, success, warning, danger or info. A closure receives
+     * $state and $record, as it does in icon() and url(). A cell with no value
+     * runs neither this nor icon(), so $state can be typed.
+     */
+    public function color(string|Closure|null $color): static
+    {
+        $this->color = $color;
+
+        return $this;
+    }
+
+    public function icon(string|Closure|null $icon): static
+    {
+        $this->icon = $icon;
+
+        return $this;
+    }
+
+    /**
+     * Link the cell. A URL outside http(s), mailto, tel or this site shows no
+     * link, because a closure may build it from a record.
+     */
+    public function url(string|Closure|null $url, bool $openInNewTab = false): static
+    {
+        $this->url = $url;
+        $this->opensUrlInNewTab = $openInNewTab;
 
         return $this;
     }
@@ -370,7 +423,7 @@ abstract class Column
     /**
      * @internal Extend getProps() instead.
      *
-     * @return array{name: string, type: string, label: string, sortable: bool, props: object}
+     * @return array<string, mixed>
      */
     public function toDefinition(): array
     {
@@ -379,6 +432,7 @@ abstract class Column
             'type' => $this->getType(),
             'label' => $this->getLabel(),
             'sortable' => $this->isSortable,
+            ...($this->opensUrlInNewTab ? ['opensInNewTab' => true] : []),
             'props' => (object) $this->getProps(),
         ];
     }
@@ -390,9 +444,35 @@ abstract class Column
      */
     public function toCell(Model $record): array
     {
-        $state = $this->getState($record);
+        $state = $this->reduceToKeys($this->getState($record));
 
-        return ['state' => $this->reduceToKeys($state), ...$this->getCellProps($record, $state)];
+        return [
+            'state' => is_array($state)
+                ? array_map(fn (mixed $value): mixed => $this->formatValue($value, $record), $state)
+                : $this->formatValue($state, $record),
+            ...array_filter([
+                // shortcut: a list gets one color and icon, and its closure receives the array. Send one per value if a table needs that.
+                'color' => $state === null ? null : $this->evaluateForCell($this->color, $record, $state),
+                'icon' => $state === null ? null : $this->evaluateForCell($this->icon, $record, $state),
+                'url' => SafeUrl::filter($this->evaluateForCell($this->url, $record, $state)),
+                ...$this->getCellProps($record, $state),
+            ], fn (mixed $value): bool => $value !== null),
+        ];
+    }
+
+    /**
+     * What the cell shows for one value.
+     */
+    protected function formatValue(mixed $value, Model $record): mixed
+    {
+        return $this->formatStateUsing === null || $value === null
+            ? $value
+            : $this->evaluate($this->formatStateUsing, ['state' => $value, 'record' => $record]);
+    }
+
+    protected function evaluateForCell(mixed $value, Model $record, mixed $state): mixed
+    {
+        return $this->evaluate($value, ['record' => $record, 'state' => $state]);
     }
 
     /**

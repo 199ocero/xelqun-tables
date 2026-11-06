@@ -1,8 +1,15 @@
+import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
     plugins: [vue()],
+    resolve: {
+        alias: {
+            // Lets the column stub import the package by name, like a real plugin.
+            '@xelqun/tables': fileURLToPath(new URL('./resources/js/index.ts', import.meta.url)),
+        },
+    },
     test: {
         environment: 'happy-dom',
         include: ['tests/js/**/*.test.ts'],

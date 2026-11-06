@@ -1,0 +1,16 @@
+{
+    "column": [
+        {
+            "name": "created_at",
+            "type": "text-column",
+            "label": "Created At",
+            "sortable": false,
+            "props": {}
+        }
+    ],
+    "cell": {
+        "created_at": {
+            "state": "Jan 15, 2026"
+        }
+    }
+}

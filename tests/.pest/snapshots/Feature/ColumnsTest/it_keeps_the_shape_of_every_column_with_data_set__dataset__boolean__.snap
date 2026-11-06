@@ -1,0 +1,19 @@
+{
+    "column": [
+        {
+            "name": "name",
+            "type": "icon-column",
+            "label": "Name",
+            "sortable": false,
+            "props": {}
+        }
+    ],
+    "cell": {
+        "name": {
+            "state": "Keyboard",
+            "color": "success",
+            "icon": "check",
+            "label": "Yes"
+        }
+    }
+}

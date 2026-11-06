@@ -5,6 +5,7 @@ export interface TableColumn {
     type: string;
     label: string;
     sortable: boolean;
+    opensInNewTab?: boolean;
     props: Record<string, any>;
 }
 

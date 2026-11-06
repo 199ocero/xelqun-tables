@@ -1,0 +1,16 @@
+{
+    "column": [
+        {
+            "name": "price",
+            "type": "text-column",
+            "label": "Price",
+            "sortable": false,
+            "props": {}
+        }
+    ],
+    "cell": {
+        "price": {
+            "state": "$1,234.50"
+        }
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "column": [
+        {
+            "name": "name",
+            "type": "text-column",
+            "label": "Name",
+            "sortable": false,
+            "opensInNewTab": true,
+            "props": {
+                "badge": true
+            }
+        }
+    ],
+    "cell": {
+        "name": {
+            "state": "Keyboard",
+            "color": "success",
+            "icon": "star",
+            "url": "\/products"
+        }
+    }
+}
