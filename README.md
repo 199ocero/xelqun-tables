@@ -1,3 +1,13 @@
+<p align="center">
+    <img src="https://raw.githubusercontent.com/199ocero/xelqun-tables/main/.github/art/banner.png" alt="Xelqun Tables: PHP-defined tables for Laravel, Inertia and Vue" width="100%">
+</p>
+
+<p align="center">
+    <a href="https://packagist.org/packages/xelqun/tables"><img src="https://img.shields.io/packagist/v/xelqun/tables?label=packagist&color=414fd2" alt="Packagist version"></a>
+    <a href="https://www.npmjs.com/package/@xelqun/tables"><img src="https://img.shields.io/npm/v/@xelqun/tables?label=npm&color=414fd2" alt="npm version"></a>
+    <a href="https://packagist.org/packages/xelqun/tables/stats"><img src="https://img.shields.io/packagist/dt/xelqun/tables?color=414fd2" alt="Total downloads"></a>
+</p>
+
 Describe a table in PHP and generic Vue components render it. Normal tables need no Vue at all.
 
 > **Pre-alpha:** the API will change. Requires Laravel 13, Inertia 3, Vue 3.5, Tailwind 4 and [`xelqun/forms`](https://github.com/199ocero/xelqun-forms).
@@ -61,7 +71,7 @@ class ProductsTable extends Table
 - **Actions reuse forms.** Row, header and bulk actions get modals, uploads and live fields with no new code.
 - **Links keep working.** Search, sort, filters and the page live in the URL, so a refresh or a shared link shows the same rows.
 - **Secure by default.** Tables rebuild from an encrypted token, and every row comes back through your query on every request.
-- **Plugins are forms plugins.** A custom column is a PHP class and a Vue cell. See the [plugin guide](docs/plugins.md).
+- **Custom columns.** A column of your own is a PHP class and a Vue cell.
 
 ## Installation
 
@@ -103,11 +113,21 @@ defineProps<{ table: TableSchema }>();
 
 `php artisan make:xelqun-table ProductsTable` creates a table class.
 
+## Plugins
+
+Other packages can add columns, with the same sorting, search and links as built-in ones. A tables plugin is a forms plugin, so install one with `php artisan xelqun-forms:plugin acme/sparkline`, or build one with the [plugin guide](docs/plugins.md).
+
+## Before going to production
+
+- **Add your rules to `authorize()`.** It allows everything by default.
+- **Give each action its own `authorize()`.** An action does nothing without one, and the table's `authorize()` doesn't count.
+- **Scope `query()` to what the viewer may see.** Every row and every action stays inside it, so this is your main line of defence.
+
 ## Things to know
 
 - **`query()` also runs on the table's own requests**, where the page's route parameters are gone. Pass what it needs through `make($context)`, as above. The context travels in an encrypted token, so keep it to scalar values.
-- **`authorize()` runs on every request.** Use it for who may see the table.
-- **Actions do nothing until their own `authorize()` allows them**, so a missing `authorize()` hides the button. Seeing a table doesn't grant anything else.
+- **`authorize()` runs on every request.**
+- **A missing `authorize()` on an action hides its button.**
 - **Closures get values by parameter name.** Write `$record`, `$records`, `$state`, `$query`, `$data` or `$direction`. Another name gets a value from the container, not your row.
 - **`$set` and `$get` do nothing in a table action**, because the table has no form state. Use the record.
 - **Don't use `Action::record()` in a table.** The table already finds the row.
@@ -123,6 +143,10 @@ defineProps<{ table: TableSchema }>();
 
 Grouping, summaries, reordering, editable columns and session persistence aren't built yet.
 
+## Inspiration
+
+Xelqun Tables is heavily inspired by [Filament](https://filamentphp.com). I'm a big fan of Filament and have built several packages for it, and this project brings its PHP-first way of building tables to Inertia and Vue.
+
 ## License
 
-MIT. Inspired by [Filament](https://filamentphp.com).
+MIT
