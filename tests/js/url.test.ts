@@ -43,6 +43,12 @@ describe('table url state', () => {
         );
     });
 
+    it('writes booleans the way the server reads them', () => {
+        expect(writeQuery('', 'orders', { filters: { on: true, off: false } })).toBe(
+            '?orders[filters][off]=0&orders[filters][on]=1',
+        );
+    });
+
     it('compares a url string with a server number', () => {
         expect(isSameQuery('orders', { page: '2' }, { page: 2 })).toBe(true);
         expect(isSameQuery('orders', { page: '2', per_page: '5' }, { per_page: 5, page: 2 })).toBe(

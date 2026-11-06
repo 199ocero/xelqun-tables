@@ -31,6 +31,8 @@ abstract class TestCase extends Orchestra
             $table->foreignId('category_id')->nullable();
             $table->string('name');
             $table->string('secret')->nullable();
+            $table->string('status')->nullable();
+            $table->boolean('is_featured')->default(false);
             $table->decimal('price', 12, 2)->default(0);
             $table->timestamps();
         });

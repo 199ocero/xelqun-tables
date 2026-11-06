@@ -5,11 +5,14 @@ namespace Xelqun\Tables;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Xelqun\Forms\Security\FormToken;
 use Xelqun\Forms\Security\FormTokenEncrypter;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
+use Xelqun\Tables\Filters\BaseFilter;
+use Xelqun\Tables\Filters\TableFiltersForm;
 use Xelqun\Tables\Schema\SchemaVersion;
 use Xelqun\Tables\State\TableState;
 
@@ -33,6 +36,14 @@ abstract class Table
 
     /** @var array<int, Column>|null */
     private ?array $mountedColumns = null;
+
+    /** @var array<int, BaseFilter>|null */
+    private ?array $mountedFilters = null;
+
+    private ?TableFiltersForm $filtersForm = null;
+
+    /** @var array<string, mixed>|null */
+    private ?array $filterDefaults = null;
 
     /**
      * @param  array<string, mixed>  $context  Scalar values that are needed to rebuild the table.
@@ -67,9 +78,62 @@ abstract class Table
      */
     abstract public function columns(): array;
 
+    /**
+     * @return array<int, BaseFilter>
+     */
+    public function filters(): array
+    {
+        return [];
+    }
+
     public function authorize(?Authenticatable $user): bool
     {
         return true;
+    }
+
+    /**
+     * @internal
+     *
+     * @return array<string, mixed>
+     */
+    public function getContext(): array
+    {
+        return $this->context;
+    }
+
+    /**
+     * The filters the viewer may use. A hidden one is left out of everything.
+     *
+     * @return array<int, BaseFilter>
+     */
+    public function getFilters(): array
+    {
+        return $this->mountedFilters ??= array_values(array_filter(
+            array_map(fn (BaseFilter $filter): BaseFilter => $filter->mount($this), $this->filters()),
+            fn (BaseFilter $filter): bool => ! $filter->isHidden(),
+        ));
+    }
+
+    /**
+     * @internal
+     */
+    public function getFiltersForm(): TableFiltersForm
+    {
+        return $this->filtersForm ??= TableFiltersForm::for($this);
+    }
+
+    /**
+     * What each filter field holds before the viewer changes it.
+     *
+     * @internal
+     *
+     * @return array<string, mixed>
+     */
+    public function getFilterDefaults(): array
+    {
+        return $this->filterDefaults ??= $this->getFilters() === []
+            ? []
+            : TableFiltersForm::for($this)->getData();
     }
 
     /**
@@ -177,6 +241,7 @@ abstract class Table
         abort_unless($this->authorize(auth()->user()), 403);
 
         $input = request()->query($this->getId());
+        $result = $this->toResult(TableState::from(is_array($input) ? $input : [], $this));
 
         return [
             '$xq' => SchemaVersion::CURRENT,
@@ -187,7 +252,9 @@ abstract class Table
             'searchable' => $this->isSearchable(),
             ...$this->getClientMessages(),
             'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $this->getColumns()),
-            ...$this->toResult(TableState::from(is_array($input) ? $input : [], $this)),
+            'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
+            'filterDefaults' => (object) $this->getFilterDefaults(),
+            ...$result,
         ];
     }
 
@@ -196,7 +263,7 @@ abstract class Table
      *
      * @internal
      *
-     * @return array{query: object, sort: string|null, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
+     * @return array{query: object, sort: string|null, activeFilters: int, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
      */
     public function toResult(TableState $state): array
     {
@@ -211,6 +278,7 @@ abstract class Table
         return [
             'query' => (object) $state->toQuery($this),
             'sort' => $state->sort,
+            'activeFilters' => count($this->getActiveFilters($state)),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
                 'cells' => collect($columns)
@@ -225,6 +293,17 @@ abstract class Table
                 'options' => $this->paginationPageOptions,
             ],
         ];
+    }
+
+    /**
+     * @return array<int, BaseFilter>
+     */
+    private function getActiveFilters(TableState $state): array
+    {
+        return array_values(array_filter(
+            $this->getFilters(),
+            fn (BaseFilter $filter): bool => $filter->isActive(Arr::only($state->filters, $filter->getFieldNames())),
+        ));
     }
 
     /**
@@ -248,6 +327,17 @@ abstract class Table
                     }
                 }
             }));
+        }
+
+        $activeFilters = $this->getActiveFilters($state);
+
+        if ($activeFilters !== []) {
+            // One group for each, so an orWhere in a filter's closure stays inside that filter.
+            $query->withGlobalScope('xelqun-filters', function (Builder $scoped) use ($activeFilters, $state): void {
+                foreach ($activeFilters as $filter) {
+                    $scoped->where(fn (Builder $group) => $filter->apply($group, Arr::only($state->filters, $filter->getFieldNames())));
+                }
+            });
         }
 
         if ($state->sort !== null) {

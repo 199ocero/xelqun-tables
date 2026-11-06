@@ -9,9 +9,14 @@ function flatten(value: TableQuery, prefix: string): [string, string][] {
             const item = value[key];
             const name = `${prefix}[${key}]`;
 
-            return typeof item === 'object' && item !== null
-                ? flatten(item, name)
-                : ([[name, String(item ?? '')]] as [string, string][]);
+            if (typeof item === 'object' && item !== null) {
+                return flatten(item, name);
+            }
+
+            // "false" isn't a boolean to Laravel's rules, and "0" is.
+            return [
+                [name, typeof item === 'boolean' ? String(Number(item)) : String(item ?? '')],
+            ] as [string, string][];
         });
 }
 

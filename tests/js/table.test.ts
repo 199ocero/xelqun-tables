@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 import { createXelqunForms, defaultComponents } from '@xelqun/forms';
+import { fieldNode, formSchema } from '@xelqun/forms/testing';
 import { builtInCells } from '../../resources/js/components/cells';
 import XqTable from '../../resources/js/components/XqTable.vue';
 import type { TableSchema } from '../../resources/js/schema/types';
@@ -21,8 +22,11 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         token: 'token',
         endpoints: { query: '/query' },
         searchable: false,
+        filters: null,
+        filterDefaults: {},
         query: {},
         sort: null,
+        activeFilters: 0,
         columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} }],
         rows: [{ key: '1', cells: { name: { state: 'Keyboard' } } }],
         pagination: { page: 1, perPage: 10, total: 1, lastPage: 1, options: [10] },
@@ -468,5 +472,100 @@ describe('cells', () => {
 
     it('adds no link to a cell without a url', () => {
         expect(cell('text-column', { state: 'a' }).find('a').exists()).toBe(false);
+    });
+});
+
+describe('filters', () => {
+    const filters = formSchema([fieldNode('data.status', 'text-input')], { status: null });
+    const table = () => schema({ filters, filterDefaults: { status: null } });
+
+    function popoverButton(label: string): HTMLButtonElement {
+        return [
+            ...document.body.querySelectorAll<HTMLButtonElement>('[data-slot="xq-popover"] button'),
+        ].find((button) => button.textContent?.includes(label))!;
+    }
+
+    async function openFilters(wrapper: ReturnType<typeof mount>) {
+        await wrapper.find('[data-xq-table-filters]').trigger('click');
+        await flushPromises();
+
+        return document.body.querySelector<HTMLInputElement>('[data-slot="xq-popover"] input')!;
+    }
+
+    it('shows how many filters are on', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({ filters, filterDefaults: { status: null }, activeFilters: 2 }),
+            },
+        });
+
+        expect(wrapper.find('[data-xq-table-filters] [data-slot="xq-badge"]').text()).toBe('2');
+    });
+
+    it('sends the form when applied, and goes back to page one', async () => {
+        const fetchMock = respondWith({
+            query: { filters: { status: 'draft' } },
+            sort: null,
+            activeFilters: 1,
+            rows: [],
+        });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table: table() }, attachTo: document.body });
+        const input = await openFilters(wrapper);
+
+        input.value = 'draft';
+        input.dispatchEvent(new Event('input'));
+        document.body
+            .querySelector<HTMLFormElement>('[data-slot="xq-popover"] form')!
+            .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock)).query).toEqual({
+            filters: { status: 'draft' },
+            page: 1,
+        });
+        wrapper.unmount();
+    });
+
+    it('goes back to the defaults on reset', async () => {
+        const fetchMock = respondWith({ query: {}, sort: null, activeFilters: 0, rows: [] });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const start = { ...table(), query: { filters: { status: 'draft' } } };
+
+        window.history.replaceState(null, '', '/products?products-table[filters][status]=draft');
+
+        const wrapper = mount(XqTable, { props: { table: start }, attachTo: document.body });
+
+        await openFilters(wrapper);
+        popoverButton('Reset').click();
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock)).query.filters).toEqual({ status: null });
+        wrapper.unmount();
+    });
+
+    it('fills the form from what the table loaded, as after Back', async () => {
+        const fetchMock = respondWith({
+            query: { filters: { status: 'draft' } },
+            sort: null,
+            activeFilters: 1,
+            rows: [],
+        });
+
+        vi.stubGlobal('fetch', fetchMock);
+        window.history.replaceState(null, '', '/products?products-table[filters][status]=draft');
+
+        const wrapper = mount(XqTable, { props: { table: table() }, attachTo: document.body });
+
+        await flushPromises();
+
+        const input = await openFilters(wrapper);
+
+        expect(input.value).toBe('draft');
+        wrapper.unmount();
     });
 });

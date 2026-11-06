@@ -29,8 +29,11 @@
             "props": {}
         }
     ],
+    "filters": null,
+    "filterDefaults": {},
     "query": {},
     "sort": null,
+    "activeFilters": 0,
     "rows": [
         {
             "key": "1",

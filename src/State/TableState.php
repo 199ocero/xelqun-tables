@@ -2,6 +2,9 @@
 
 namespace Xelqun\Tables\State;
 
+use Illuminate\Support\Arr;
+use Xelqun\Forms\Support\StatePath;
+use Xelqun\Forms\Validation\FormValidator;
 use Xelqun\Tables\Table;
 
 /**
@@ -15,12 +18,14 @@ final class TableState
 
     /**
      * @param  string|null  $sort  A sortable column's name, with a leading "-" for descending.
+     * @param  array<string, mixed>  $filters  Every filter field's value.
      */
     public function __construct(
         public readonly int $page,
         public readonly int $perPage,
         public readonly string $search = '',
         public readonly ?string $sort = null,
+        public readonly array $filters = [],
     ) {}
 
     /**
@@ -40,27 +45,73 @@ final class TableState
             sort: is_string($sort) && $table->findSortableColumn(str_starts_with($sort, '-') ? substr($sort, 1) : $sort) !== null
                 ? $sort
                 : $table->getDefaultSort(),
+            filters: self::readFilters($input['filters'] ?? [], $table),
         );
+    }
+
+    /**
+     * Only declared fields get through, and a field's own rules decide if its
+     * value is valid. A bad value falls back to the default without an error,
+     * because the first render has nowhere to show one.
+     *
+     * @return array<string, mixed>
+     */
+    private static function readFilters(mixed $input, Table $table): array
+    {
+        if ($table->getFilters() === []) {
+            return [];
+        }
+
+        $form = $table->getFiltersForm();
+        $defaults = $table->getFilterDefaults();
+        $posted = Arr::only(is_array($input) ? $input : [], array_keys($defaults));
+        $posted = array_map(fn (mixed $value): mixed => $value === '' ? null : $value, $posted);
+        $validator = app(FormValidator::class);
+
+        $validator->prepare($form, [...$defaults, ...$posted]);
+
+        foreach (array_keys($validator->errorsFor($form, [StatePath::ROOT])) as $path) {
+            $name = explode('.', $path)[1];
+            $form->setStateValue(StatePath::ROOT.".{$name}", $defaults[$name] ?? null);
+        }
+
+        return Arr::only($form->getData(), array_keys($defaults));
     }
 
     public function withPage(int $page): self
     {
-        return new self($page, $this->perPage, $this->search, $this->sort);
+        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters);
     }
 
     /**
      * The URL's version of this state. Defaults are left out, so an untouched
      * table keeps a clean URL.
      *
-     * @return array<string, int|string>
+     * @return array<string, mixed>
      */
     public function toQuery(Table $table): array
     {
+        $defaults = $table->getFilterDefaults();
+        $filters = array_filter(
+            $this->filters,
+            fn (mixed $value, string $name): bool => ! self::isSameValue($value, $defaults[$name] ?? null),
+            ARRAY_FILTER_USE_BOTH,
+        );
+
         return array_filter([
             'search' => $this->search === '' ? null : $this->search,
             'sort' => $this->sort === $table->getDefaultSort() ? null : $this->sort,
+            'filters' => $filters === [] ? null : $filters,
             'page' => $this->page > 1 ? $this->page : null,
             'per_page' => $this->perPage === $table->getPaginationPageOptions()[0] ? null : $this->perPage,
-        ], fn (int|string|null $value): bool => $value !== null);
+        ], fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * The URL holds "1" where a default holds 1.
+     */
+    private static function isSameValue(mixed $first, mixed $second): bool
+    {
+        return json_encode($first, JSON_NUMERIC_CHECK) === json_encode($second, JSON_NUMERIC_CHECK);
     }
 }

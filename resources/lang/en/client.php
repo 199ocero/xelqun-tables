@@ -6,12 +6,15 @@
  */
 
 return [
+    'Apply' => 'Apply',
     'Could not load the records.' => 'Could not load the records.',
+    'Filters' => 'Filters',
     'Next page' => 'Next page',
     'No records found.' => 'No records found.',
     'Page :current of :last' => 'Page :current of :last',
     'Per page' => 'Per page',
     'Previous page' => 'Previous page',
+    'Reset' => 'Reset',
     'Retry' => 'Retry',
     'Search' => 'Search',
     'Showing :from to :until of :total' => 'Showing :from to :until of :total',

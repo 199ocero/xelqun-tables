@@ -17,8 +17,11 @@ const table: TableSchema = {
     token: 'token',
     endpoints: { query: '/query' },
     searchable: true,
+    filters: null,
+    filterDefaults: {},
     query: {},
     sort: null,
+    activeFilters: 0,
     columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: true, props: {} }],
     rows: [
         { key: '1', cells: { name: { state: 'Keyboard', url: '/products/1' } } },

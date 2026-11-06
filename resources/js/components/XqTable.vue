@@ -10,6 +10,7 @@ import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
 import type { TableQuery, TableSchema } from '../schema/types';
 import { builtInCells } from './cells';
 import XqCellLink from './XqCellLink.vue';
+import XqTableFilters from './XqTableFilters.vue';
 import XqTablePagination from './XqTablePagination.vue';
 import XqTableSearch from './XqTableSearch.vue';
 
@@ -93,12 +94,28 @@ onMounted(() => {
                 {{ t('Retry') }}
             </XqButton>
         </div>
-        <XqTableSearch
-            v-if="schema.searchable"
-            :value="schema.query.search ?? ''"
-            :t="t"
-            @search="store.update({ search: $event, page: 1 })"
-        />
+        <div
+            v-if="schema.searchable || schema.filters"
+            class="gap-3 flex items-center justify-between"
+        >
+            <XqTableSearch
+                v-if="schema.searchable"
+                :value="schema.query.search ?? ''"
+                :t="t"
+                @search="store.update({ search: $event, page: 1 })"
+            />
+            <XqTableFilters
+                v-if="schema.filters"
+                :key="schema.filters.token ?? undefined"
+                class="ml-auto"
+                :form="schema.filters"
+                :defaults="schema.filterDefaults"
+                :values="schema.query.filters"
+                :active="schema.activeFilters"
+                :t="t"
+                @apply="store.update({ filters: $event, page: 1 })"
+            />
+        </div>
         <div
             :class="
                 cn(

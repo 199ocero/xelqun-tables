@@ -13,8 +13,11 @@ function schema(): TableSchema {
         token: 'token',
         endpoints: { query: '/query' },
         searchable: false,
+        filters: null,
+        filterDefaults: {},
         query: {},
         sort: null,
+        activeFilters: 0,
         columns: [],
         rows: [],
         pagination,
@@ -22,7 +25,13 @@ function schema(): TableSchema {
 }
 
 function result(page: number): TableResult {
-    return { query: { page }, sort: null, rows: [], pagination: { ...pagination, page } };
+    return {
+        query: { page },
+        sort: null,
+        activeFilters: 0,
+        rows: [],
+        pagination: { ...pagination, page },
+    };
 }
 
 function response(body: unknown, status = 200): Response {

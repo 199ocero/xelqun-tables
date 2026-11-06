@@ -1,3 +1,5 @@
+import type { FormSchema } from '@xelqun/forms';
+
 export const SUPPORTED_SCHEMA_VERSIONS = [1] as const;
 
 export interface TableColumn {
@@ -36,6 +38,7 @@ export interface TableResult {
     query: TableQuery;
     /** A column's name, with a leading "-" for descending. */
     sort: string | null;
+    activeFilters: number;
     rows: TableRow[];
     pagination: TablePagination;
 }
@@ -47,6 +50,8 @@ export interface TableSchema extends TableResult {
     token: string;
     endpoints: { query: string };
     searchable: boolean;
+    filters: FormSchema | null;
+    filterDefaults: Record<string, unknown>;
     messages?: Record<string, string>;
     columns: TableColumn[];
 }
