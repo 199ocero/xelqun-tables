@@ -113,6 +113,28 @@ defineProps<{ table: TableSchema }>();
 
 `php artisan make:xelqun-table ProductsTable` creates a table class.
 
+## Editing in the table
+
+`ToggleColumn`, `CheckboxColumn`, `TextInputColumn` and `SelectColumn` save as you change them. They're read-only until `authorize()` says who can edit, the same as actions:
+
+```php
+ToggleColumn::make('is_featured')->authorize('update'),
+TextInputColumn::make('name')->authorize('update')->rules(['required', 'max:120']),
+SelectColumn::make('status')->authorize('update')->options(['draft' => 'Draft', 'live' => 'Live']),
+```
+
+The row comes through `query()`, and a select only takes its own options. For a relation's column, or anything else, use `updateStateUsing(fn ($state, $record) => ...)`.
+
+## Summaries and groups
+
+`summarize()` adds lines under a column, worked out over every row of the search and filters, not just this page, and formatted like the column:
+
+```php
+TextColumn::make('price')->money('USD')->summarize([Sum::make()->label('Total'), Average::make()]),
+```
+
+`Count` and `Range` work the same way. `defaultGroup('status')` in `boot()` puts rows under a heading for each value, and keeps a group together whatever the sort.
+
 ## Plugins
 
 Other packages can add columns, with the same sorting, search and links as built-in ones. A tables plugin is a forms plugin, so install one with `php artisan xelqun-forms:plugin acme/sparkline`, or build one with the [plugin guide](docs/plugins.md).

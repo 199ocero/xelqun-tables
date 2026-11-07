@@ -2,6 +2,15 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Added
+
+- **Editable columns.** `ToggleColumn`, `CheckboxColumn`, `TextInputColumn` and `SelectColumn`. They're read-only until `authorize()` says who can edit them, and the row comes through the table's query.
+- **`ColorColumn`** shows a swatch.
+- **Summaries.** `summarize()` with `Sum`, `Average`, `Count` and `Range`, over every row of the search and filters.
+- **Grouping.** `defaultGroup()` keeps rows together under a heading.
+
 ## 0.4.0 - 2026-11-06
 
 This release needs `xelqun/forms` 0.6. The schema version (`$xq`) stays 1.

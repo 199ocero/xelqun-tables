@@ -11,7 +11,7 @@ function schema(): TableSchema {
         pkg: '0.1.0',
         id: 'orders',
         token: 'token',
-        endpoints: { query: '/query', action: '/action' },
+        endpoints: { query: '/query', update: '/update', action: '/action' },
         headerActions: [],
         bulkActions: [],
         maxSelectable: 1000,
@@ -21,6 +21,7 @@ function schema(): TableSchema {
         query: {},
         sort: null,
         activeFilters: 0,
+        summaries: {},
         columns: [],
         rows: [],
         pagination,
@@ -32,6 +33,7 @@ function result(page: number): TableResult {
         query: { page },
         sort: null,
         activeFilters: 0,
+        summaries: {},
         rows: [],
         pagination: { ...pagination, page },
     };
@@ -388,5 +390,56 @@ describe('table store', () => {
             per_page: 25,
             page: 3,
         });
+    });
+});
+
+describe('updateCell', () => {
+    const row = {
+        key: '1',
+        cells: { name: { state: 'Lamp' } },
+        actions: [],
+    };
+
+    it('posts the cell and replaces it with the answer', async () => {
+        const fetchMock = vi.fn(
+            async (_url: string, _init: RequestInit) =>
+                new Response(JSON.stringify({ cell: { state: 'Bulb' } })),
+        );
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const store = createTableStore({ ...schema(), rows: [row] });
+
+        await store.updateCell('1', 'name', 'Bulb');
+
+        expect(store.schema.value.rows[0].cells.name.state).toBe('Bulb');
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({
+            record: '1',
+            column: 'name',
+            value: 'Bulb',
+        });
+        vi.unstubAllGlobals();
+    });
+
+    it('shows why a value was refused, and hands the cell back so it can reset', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(
+                async () =>
+                    new Response(JSON.stringify({ errors: { value: ['Too long.'] } }), {
+                        status: 422,
+                    }),
+            ),
+        );
+
+        const store = createTableStore({ ...schema(), rows: [row] });
+        const before = store.schema.value.rows[0].cells.name;
+
+        await store.updateCell('1', 'name', 'x'.repeat(99));
+
+        expect(store.error.value).toBe('Too long.');
+        expect(store.schema.value.rows[0].cells.name).toEqual(before);
+        expect(store.schema.value.rows[0].cells.name).not.toBe(before);
+        vi.unstubAllGlobals();
     });
 });

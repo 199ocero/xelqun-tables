@@ -7,7 +7,7 @@ import type {
     SchemaNode,
 } from '@xelqun/forms';
 import { ref, shallowRef } from 'vue';
-import type { TableQuery, TableResult, TableSchema } from '../schema/types';
+import type { TableCell, TableQuery, TableResult, TableSchema } from '../schema/types';
 
 export interface TableStoreOptions {
     /** Runs after the server answers, with the state to put in the URL. */
@@ -94,6 +94,45 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         }
 
         return load({ ...lastQuery, ...changes });
+    }
+
+    /**
+     * Save one editable cell. The answer replaces the cell, and on a failure the
+     * cell gets a new object, so it drops what was typed for what's saved.
+     */
+    async function updateCell(key: string, column: string, value: unknown): Promise<void> {
+        error.value = null;
+
+        const replaceCell = (cell?: TableCell): void => {
+            schema.value = {
+                ...schema.value,
+                rows: schema.value.rows.map((row) =>
+                    row.key === key
+                        ? {
+                              ...row,
+                              cells: { ...row.cells, [column]: cell ?? { ...row.cells[column] } },
+                          }
+                        : row,
+                ),
+            };
+        };
+
+        try {
+            const { cell } = await postJson<{ cell: TableCell }>(schema.value.endpoints.update, {
+                token: schema.value.token,
+                record: key,
+                column,
+                value,
+            });
+
+            replaceCell(cell);
+        } catch (failure) {
+            const message =
+                failure instanceof HttpError ? failure.validationErrors.value?.[0] : undefined;
+
+            error.value = message ?? failureMessage(failure, 'Could not save the change.');
+            replaceCell();
+        }
     }
 
     function clearSelection(): void {
@@ -246,6 +285,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         t,
         load,
         update,
+        updateCell,
         retry,
         reset,
         dispose,

@@ -4,6 +4,7 @@
     "id": "products-table",
     "endpoints": {
         "query": "\/_xelqun\/tables\/query",
+        "update": "\/_xelqun\/tables\/update",
         "action": "\/_xelqun\/tables\/action"
     },
     "searchable": false,
@@ -38,6 +39,7 @@
     "query": {},
     "sort": null,
     "activeFilters": 0,
+    "summaries": [],
     "rows": [
         {
             "key": "1",

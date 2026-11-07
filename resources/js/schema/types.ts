@@ -26,6 +26,8 @@ export interface TableAction {
 export interface TableRow {
     key: string;
     url?: string;
+    /** The heading this row sits under, on a grouped table. */
+    group?: string;
     cells: Record<string, TableCell>;
     actions: TableAction[];
 }
@@ -48,6 +50,7 @@ export interface TableResult {
     /** A column's name, with a leading "-" for descending. */
     sort: string | null;
     activeFilters: number;
+    summaries: Record<string, Array<{ label: string | null; value: unknown }>>;
     rows: TableRow[];
     pagination: TablePagination;
 }
@@ -57,7 +60,7 @@ export interface TableSchema extends TableResult {
     pkg: string;
     id: string;
     token: string;
-    endpoints: { query: string; action: string };
+    endpoints: { query: string; update: string; action: string };
     headerActions: TableAction[];
     bulkActions: TableAction[];
     maxSelectable: number;

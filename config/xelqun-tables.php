@@ -16,6 +16,7 @@ return [
         'middleware' => ['web'],
         'throttle' => [
             'query' => '240,1',
+            'update' => '120,1',
             'action' => '60,1',
         ],
     ],

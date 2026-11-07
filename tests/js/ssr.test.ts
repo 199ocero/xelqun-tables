@@ -15,7 +15,7 @@ const table: TableSchema = {
     pkg: '0.1.0',
     id: 'products-table',
     token: 'token',
-    endpoints: { query: '/query', action: '/action' },
+    endpoints: { query: '/query', update: '/update', action: '/action' },
     headerActions: [],
     bulkActions: [],
     maxSelectable: 1000,
@@ -25,6 +25,7 @@ const table: TableSchema = {
     query: {},
     sort: null,
     activeFilters: 0,
+    summaries: {},
     columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: true, props: {} }],
     rows: [
         { key: '1', cells: { name: { state: 'Keyboard', url: '/products/1' } }, actions: [] },

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Xelqun\Tables\Http\Controllers\ActionController;
 use Xelqun\Tables\Http\Controllers\QueryController;
+use Xelqun\Tables\Http\Controllers\UpdateController;
 
 Route::prefix(config('xelqun-tables.routes.prefix'))
     ->middleware(config('xelqun-tables.routes.middleware'))
@@ -11,6 +12,10 @@ Route::prefix(config('xelqun-tables.routes.prefix'))
         Route::post('query', QueryController::class)
             ->middleware('throttle:'.config('xelqun-tables.routes.throttle.query'))
             ->name('query');
+
+        Route::post('update', UpdateController::class)
+            ->middleware('throttle:'.config('xelqun-tables.routes.throttle.update', '120,1'))
+            ->name('update');
 
         Route::post('action', ActionController::class)
             ->middleware('throttle:'.config('xelqun-tables.routes.throttle.action'))

@@ -16,6 +16,7 @@ use Xelqun\Forms\Support\SafeUrl;
 use Xelqun\Tables\Actions\BulkAction;
 use Xelqun\Tables\Actions\TableActionHost;
 use Xelqun\Tables\Columns\Column;
+use Xelqun\Tables\Columns\Contracts\Editable;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Filters\BaseFilter;
 use Xelqun\Tables\Filters\TableFiltersForm;
@@ -33,6 +34,8 @@ use Xelqun\Tables\State\TableState;
  */
 abstract class Table
 {
+    private ?string $groupColumn = null;
+
     private ?string $tableId = null;
 
     /** @var array<int, int> */
@@ -291,6 +294,30 @@ abstract class Table
         return collect($this->getColumns())->contains(fn (Column $column): bool => $column->isSearchable());
     }
 
+    /**
+     * @internal
+     */
+    public function findEditableColumn(string $name): (Column&Editable)|null
+    {
+        foreach ($this->getColumns() as $column) {
+            if ($column->getName() === $name && $column instanceof Editable) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Group rows by a column, with a heading over each group. Rows sort by it first.
+     */
+    public function defaultGroup(?string $column): static
+    {
+        $this->groupColumn = $column;
+
+        return $this;
+    }
+
     public function findSortableColumn(string $name): ?Column
     {
         return collect($this->getColumns())->first(fn (Column $column): bool => $column->isSortable() && $column->getName() === $name);
@@ -380,6 +407,7 @@ abstract class Table
             'token' => $this->makeToken(),
             'endpoints' => [
                 'query' => route('xelqun.tables.query', absolute: false),
+                'update' => route('xelqun.tables.update', absolute: false),
                 'action' => route('xelqun.tables.action', absolute: false),
             ],
             'searchable' => $this->isSearchable(),
@@ -417,9 +445,10 @@ abstract class Table
             'query' => (object) $state->toQuery($this),
             'sort' => $state->sort,
             'activeFilters' => count($this->getActiveFilters($state)),
+            'summaries' => $this->getSummaries($state),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
-                ...array_filter(['url' => SafeUrl::filter($this->recordUrl($record))]),
+                ...array_filter(['url' => SafeUrl::filter($this->recordUrl($record)), 'group' => $this->getRowGroup($record)]),
                 'cells' => collect($columns)
                     ->mapWithKeys(fn (Column $column): array => [$column->getName() => $column->toCell($record)])
                     ->all(),
@@ -433,6 +462,42 @@ abstract class Table
                 'options' => $this->paginationPageOptions,
             ],
         ];
+    }
+
+    /**
+     * Over all the rows of this search and these filters.
+     *
+     * @return array<string, array<int, array{label: string|null, value: mixed}>>
+     */
+    private function getSummaries(TableState $state): array
+    {
+        $query = $this->buildQuery($state);
+        $summaries = [];
+
+        foreach ($this->getColumns() as $column) {
+            $lines = $column->toSummaries($query);
+
+            if ($lines !== []) {
+                $summaries[$column->getName()] = $lines;
+            }
+        }
+
+        return $summaries;
+    }
+
+    private function getRowGroup(Model $record): ?string
+    {
+        if ($this->groupColumn === null) {
+            return null;
+        }
+
+        foreach ($this->getColumns() as $column) {
+            if ($column->getName() === $this->groupColumn) {
+                return (string) ($column->toCell($record)['state'] ?? '');
+            }
+        }
+
+        return (string) $record->getAttribute($this->groupColumn);
     }
 
     /**
@@ -492,6 +557,13 @@ abstract class Table
             } else {
                 $column->applySort($query, $direction);
             }
+        }
+
+        if ($this->groupColumn !== null && ! str_contains($this->groupColumn, '.')) {
+            // Ahead of any sort, so a group's rows stay together.
+            $orders = $query->getQuery()->orders ?? [];
+            $query->reorder()->orderBy($query->qualifyColumn($this->groupColumn));
+            $query->getQuery()->orders = [...$query->getQuery()->orders, ...$orders];
         }
 
         // Rows with equal values have no order of their own, so they could repeat across pages.

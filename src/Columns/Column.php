@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Traits\Macroable;
 use Xelqun\Forms\Support\SafeUrl;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
+use Xelqun\Tables\Summarizers\Summarizer;
 use Xelqun\Tables\Table;
 
 /**
@@ -54,6 +55,9 @@ abstract class Column
     protected bool $isSearchable = false;
 
     protected ?Closure $searchUsing = null;
+
+    /** @var array<int, Summarizer> */
+    protected array $summarizers = [];
 
     final public function __construct(protected string $name) {}
 
@@ -229,6 +233,43 @@ abstract class Column
         $this->searchUsing = $query;
 
         return $this;
+    }
+
+    /**
+     * Add a line under the column.
+     *
+     * @param  Summarizer|array<int, Summarizer>  $summarizers
+     */
+    public function summarize(Summarizer|array $summarizers): static
+    {
+        $this->summarizers = is_array($summarizers) ? $summarizers : [$summarizers];
+
+        return $this;
+    }
+
+    /**
+     * Each line under the column, formatted like a cell.
+     *
+     * @internal
+     *
+     * @param  Builder<covariant Model>  $query
+     * @return array<int, array{label: string|null, value: mixed}>
+     */
+    public function toSummaries(Builder $query): array
+    {
+        $model = $query->getModel();
+        $attribute = $query->qualifyColumn($this->name);
+
+        return array_map(function (Summarizer $summarizer) use ($attribute, $model, $query): array {
+            $value = $summarizer->summarize((clone $query)->reorder(), $attribute);
+
+            return [
+                'label' => $summarizer->getLabel(),
+                'value' => is_array($value)
+                    ? implode(' – ', array_map(fn (mixed $part): string => (string) $this->formatValue($part, $model), $value))
+                    : $this->formatValue($value, $model),
+            ];
+        }, $this->summarizers);
     }
 
     public function isSortable(): bool

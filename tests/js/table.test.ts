@@ -20,7 +20,7 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         pkg: '0.1.0',
         id: 'products-table',
         token: 'token',
-        endpoints: { query: '/query', action: '/action' },
+        endpoints: { query: '/query', update: '/update', action: '/action' },
         headerActions: [],
         bulkActions: [],
         maxSelectable: 1000,
@@ -30,6 +30,7 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         query: {},
         sort: null,
         activeFilters: 0,
+        summaries: {},
         columns: [{ name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} }],
         rows: [{ key: '1', cells: { name: { state: 'Keyboard' } }, actions: [] }],
         pagination: { page: 1, perPage: 10, total: 1, lastPage: 1, options: [10] },
@@ -892,5 +893,68 @@ describe('selection', () => {
         await clear.trigger('click');
 
         expect(wrapper.find('[data-xq-table-bulk]').exists()).toBe(false);
+    });
+});
+
+describe('editable cells and grouped rows', () => {
+    const cellProps = (state: unknown, canEdit: boolean, extra = {}) => ({
+        column: { name: 'a', type: 'x', label: 'Featured', sortable: false, props: extra },
+        cell: { state, canEdit },
+    });
+
+    it("turns a switch off for someone who can't edit", () => {
+        const wrapper = mount(builtInCells['toggle-column'] as never, {
+            props: cellProps(true, false) as never,
+            global: { plugins: [createXelqunForms()] },
+        });
+
+        expect(wrapper.find('button').attributes('disabled')).toBeDefined();
+    });
+
+    it('sends a changed value once, on leaving the box', async () => {
+        const wrapper = mount(builtInCells['text-input-column'] as never, {
+            props: cellProps('Lamp', true) as never,
+            global: { plugins: [createXelqunForms()] },
+        });
+        const input = wrapper.find('input');
+
+        await input.trigger('blur');
+        expect(wrapper.emitted('update')).toBeUndefined();
+
+        await input.setValue('Bulb');
+        await input.trigger('blur');
+        expect(wrapper.emitted('update')).toEqual([['Bulb']]);
+    });
+
+    it('puts a heading over each group, and a line under the columns', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    columns: [
+                        {
+                            name: 'name',
+                            type: 'text-column',
+                            label: 'Name',
+                            sortable: false,
+                            props: {},
+                        },
+                    ],
+                    summaries: { name: [{ label: 'Count', value: 3 }] },
+                    rows: ['Red', 'Red', 'Blue'].map((group, index) => ({
+                        key: String(index),
+                        group,
+                        cells: { name: { state: 'x' } },
+                        actions: [],
+                    })),
+                }),
+            },
+            global: { plugins: [createXelqunForms()] },
+        });
+
+        expect(wrapper.findAll('[data-xq-table-group]').map((row) => row.text())).toEqual([
+            'Red',
+            'Blue',
+        ]);
+        expect(wrapper.find('[data-xq-table-summary]').text()).toMatch(/Count:\s+3/);
     });
 });

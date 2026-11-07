@@ -13,6 +13,7 @@ return [
     'Confirm' => 'Confirm',
     'Clear selection' => 'Clear selection',
     'Could not load the records.' => 'Could not load the records.',
+    'Could not save the change.' => 'Could not save the change.',
     'Filters' => 'Filters',
     'Next page' => 'Next page',
     'No records found.' => 'No records found.',

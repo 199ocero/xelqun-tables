@@ -43,6 +43,16 @@ const hasToolbar = computed(
         schema.value.headerActions.length > 0,
 );
 
+const columnCount = computed(
+    () => columns.value.length + (hasSelection.value ? 1 : 0) + (hasRowActions.value ? 1 : 0),
+);
+
+function startsGroup(index: number): boolean {
+    const row = schema.value.rows[index];
+
+    return row.group !== undefined && row.group !== schema.value.rows[index - 1]?.group;
+}
+
 /** A row's link is in every cell, and Tab should only stop on it once. */
 function isRepeatedRowLink(row: TableRow, name: string): boolean {
     const first = columns.value.find((column) => !row.cells[column.name].url);
@@ -219,55 +229,73 @@ onMounted(() => {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr
-                        v-for="row in schema.rows"
-                        :key="row.key"
-                        :class="
-                            cn(
-                                'border-xq-border border-b last:border-b-0',
-                                row.url && 'hover:bg-xq-muted/50',
-                            )
-                        "
-                    >
-                        <td v-if="hasSelection" class="px-3 py-2">
-                            <XqCheckbox
-                                :model-value="selected.has(row.key)"
-                                :aria-label="t('Select row')"
-                                @update:model-value="store.toggleRow(row.key, $event)"
-                            />
-                        </td>
-                        <td v-for="column in columns" :key="column.name" class="px-3 py-2">
-                            <XqCellLink
-                                v-if="column.cell"
-                                :url="row.cells[column.name].url ?? row.url"
-                                :new-tab="row.cells[column.name].url ? column.opensInNewTab : false"
-                                :quiet="!row.cells[column.name].url"
-                                :tabindex="isRepeatedRowLink(row, column.name) ? -1 : undefined"
+                    <template v-for="(row, index) in schema.rows" :key="row.key">
+                        <tr v-if="startsGroup(index)" data-xq-table-group>
+                            <th
+                                :colspan="columnCount"
+                                scope="colgroup"
+                                class="px-3 py-2 text-sm font-medium bg-xq-muted text-left"
                             >
+                                {{ row.group }}
+                            </th>
+                        </tr>
+                        <tr
+                            :class="
+                                cn(
+                                    'border-xq-border border-b last:border-b-0',
+                                    row.url && 'hover:bg-xq-muted/50',
+                                )
+                            "
+                        >
+                            <td v-if="hasSelection" class="px-3 py-2">
+                                <XqCheckbox
+                                    :model-value="selected.has(row.key)"
+                                    :aria-label="t('Select row')"
+                                    @update:model-value="store.toggleRow(row.key, $event)"
+                                />
+                            </td>
+                            <td v-for="column in columns" :key="column.name" class="px-3 py-2">
                                 <component
                                     :is="column.cell"
+                                    v-if="column.cell && column.props.editable"
                                     :column="column"
                                     :cell="row.cells[column.name]"
+                                    @update="store.updateCell(row.key, column.name, $event)"
                                 />
-                            </XqCellLink>
-                            <span v-else class="text-xq-destructive">
-                                {{ t('Unknown column type: :type', { type: column.type }) }}
-                            </span>
-                        </td>
-                        <td v-if="hasRowActions" class="px-3 py-2">
-                            <div class="gap-1 flex justify-end">
-                                <component
-                                    :is="action.actions ? XqActionGroup : XqAction"
-                                    v-for="action in row.actions"
-                                    :key="action.name"
-                                    :node="actionNode(action)"
-                                    :runner="
-                                        store.actionRunner({ kind: 'record', record: row.key })
+                                <XqCellLink
+                                    v-else-if="column.cell"
+                                    :url="row.cells[column.name].url ?? row.url"
+                                    :new-tab="
+                                        row.cells[column.name].url ? column.opensInNewTab : false
                                     "
-                                />
-                            </div>
-                        </td>
-                    </tr>
+                                    :quiet="!row.cells[column.name].url"
+                                    :tabindex="isRepeatedRowLink(row, column.name) ? -1 : undefined"
+                                >
+                                    <component
+                                        :is="column.cell"
+                                        :column="column"
+                                        :cell="row.cells[column.name]"
+                                    />
+                                </XqCellLink>
+                                <span v-else class="text-xq-destructive">
+                                    {{ t('Unknown column type: :type', { type: column.type }) }}
+                                </span>
+                            </td>
+                            <td v-if="hasRowActions" class="px-3 py-2">
+                                <div class="gap-1 flex justify-end">
+                                    <component
+                                        :is="action.actions ? XqActionGroup : XqAction"
+                                        v-for="action in row.actions"
+                                        :key="action.name"
+                                        :node="actionNode(action)"
+                                        :runner="
+                                            store.actionRunner({ kind: 'record', record: row.key })
+                                        "
+                                    />
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
                     <tr v-if="schema.rows.length === 0">
                         <td
                             :colspan="
@@ -287,6 +315,27 @@ onMounted(() => {
                         </td>
                     </tr>
                 </tbody>
+                <tfoot v-if="Object.keys(schema.summaries).length > 0" data-xq-table-summary>
+                    <tr class="border-xq-border border-t">
+                        <td v-if="hasSelection"></td>
+                        <td
+                            v-for="column in columns"
+                            :key="column.name"
+                            class="px-3 py-2 text-sm font-medium align-top"
+                        >
+                            <p
+                                v-for="(line, position) in schema.summaries[column.name]"
+                                :key="position"
+                            >
+                                <span v-if="line.label" class="text-xq-muted-foreground">
+                                    {{ line.label }}:
+                                </span>
+                                {{ line.value }}
+                            </p>
+                        </td>
+                        <td v-if="hasRowActions"></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
         <XqTablePagination
