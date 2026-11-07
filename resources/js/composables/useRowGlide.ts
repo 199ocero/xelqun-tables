@@ -1,5 +1,17 @@
 import { computed, ref } from 'vue';
 
+/** Layout position, because a row's on-screen one is off while it rises in. */
+function offsetWithin(row: HTMLElement, area: HTMLElement): number {
+    let top = 0;
+
+    for (let node: HTMLElement | null = row; node && node !== area;) {
+        top += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+    }
+
+    return top;
+}
+
 /**
  * One highlight that slides from row to row, passing over the ones between, in
  * place of each row lighting up by itself. It sits behind the rows, so the table
@@ -30,8 +42,8 @@ export function useRowGlide() {
         // The first row of a visit appears where it is, rather than sliding in from the last visit.
         isGliding.value = isVisible.value;
         isVisible.value = true;
-        top.value = row.getBoundingClientRect().top - area.getBoundingClientRect().top;
-        height.value = row.getBoundingClientRect().height;
+        top.value = offsetWithin(row, area);
+        height.value = Math.floor(row.getBoundingClientRect().height);
         width.value = area.scrollWidth;
     }
 

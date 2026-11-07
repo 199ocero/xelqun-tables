@@ -247,7 +247,7 @@ onMounted(() => {
         <div
             :class="
                 cn(
-                    'rounded-xq-lg border-xq-border relative overflow-x-auto border transition-opacity duration-(--xq-duration-base)',
+                    'rounded-xq-lg border-xq-border relative overflow-x-auto overflow-y-hidden border transition-opacity duration-(--xq-duration-base)',
                     loading && 'opacity-60',
                 )
             "
