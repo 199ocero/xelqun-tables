@@ -173,7 +173,7 @@ Other packages can add columns, with the same sorting, search and links as built
 - Sorting through a relation works over one `BelongsTo` or `HasOne`. Anything else needs a closure.
 - A column that isn't a real column, such as a `withCount()` alias or an accessor, needs a closure to sort or search.
 
-Grouping, summaries, reordering, editable columns and session persistence aren't built yet.
+Saving a viewer's search, sort and filters in the session isn't built yet.
 
 ## Inspiration
 
