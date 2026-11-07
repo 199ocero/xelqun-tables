@@ -374,6 +374,16 @@ abstract class Table
         return $this->reorderColumn;
     }
 
+    /**
+     * The rows a row can swap places with.
+     *
+     * @return Builder<covariant Model>
+     */
+    public function getReorderQuery(): Builder
+    {
+        return $this->query();
+    }
+
     public function canReorder(): bool
     {
         return $this->reorderColumn !== null && (bool) value($this->reorderAuthorization);

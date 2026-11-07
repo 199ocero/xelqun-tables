@@ -33,7 +33,8 @@ class ReorderController
         $isUp = $validated['direction'] === 'up';
         $position = $record->getAttribute($column);
 
-        $neighbour = $table->query()
+        // shortcut: rows with equal positions stay put, so give the column distinct values. Renumber here if an app can't.
+        $neighbour = $table->getReorderQuery()
             ->reorder()
             ->where($table->query()->qualifyColumn($column), $isUp ? '<' : '>', $position)
             ->orderBy($table->query()->qualifyColumn($column), $isUp ? 'desc' : 'asc')
