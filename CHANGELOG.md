@@ -10,6 +10,11 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 - **`ColorColumn`** shows a swatch.
 - **Summaries.** `summarize()` with `Sum`, `Average`, `Count` and `Range`, over every row of the search and filters.
 - **Grouping.** `defaultGroup()` keeps rows together under a heading.
+- **`QueryBuilder` filter.** People build their own rules from `TextConstraint`, `NumberConstraint`, `DateConstraint`, `BooleanConstraint` and `SelectConstraint`.
+- **Row reordering.** `reorderable('sort', fn () => ...)` adds up and down buttons.
+- **Column toggles.** `toggleable()` lets the viewer hide a column.
+- **`contentGrid()`** shows rows as cards, **`striped()`** shades every other row, and **`poll('10s')`** keeps a table fresh.
+- **Enums.** A cast enum's `getLabel()`, `getColor()` and `getIcon()` fill in the cell.
 
 ## 0.4.0 - 2026-11-06
 

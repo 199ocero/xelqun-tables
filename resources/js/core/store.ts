@@ -135,6 +135,26 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         }
     }
 
+    function reload(): Promise<void> {
+        return load(lastQuery);
+    }
+
+    /** Move a row, then show the order the server now has. */
+    async function moveRow(key: string, direction: 'up' | 'down'): Promise<void> {
+        error.value = null;
+
+        try {
+            await postJson(schema.value.endpoints.reorder, {
+                token: schema.value.token,
+                record: key,
+                direction,
+            });
+            await reload();
+        } catch (failure) {
+            error.value = failureMessage(failure, 'Could not save the change.');
+        }
+    }
+
     function clearSelection(): void {
         selected.value = new Set();
     }
@@ -286,6 +306,8 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         load,
         update,
         updateCell,
+        reload,
+        moveRow,
         retry,
         reset,
         dispose,

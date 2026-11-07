@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Xelqun\Tables\Http\Controllers\ActionController;
 use Xelqun\Tables\Http\Controllers\QueryController;
+use Xelqun\Tables\Http\Controllers\ReorderController;
 use Xelqun\Tables\Http\Controllers\UpdateController;
 
 Route::prefix(config('xelqun-tables.routes.prefix'))
@@ -16,6 +17,10 @@ Route::prefix(config('xelqun-tables.routes.prefix'))
         Route::post('update', UpdateController::class)
             ->middleware('throttle:'.config('xelqun-tables.routes.throttle.update', '120,1'))
             ->name('update');
+
+        Route::post('reorder', ReorderController::class)
+            ->middleware('throttle:'.config('xelqun-tables.routes.throttle.update', '120,1'))
+            ->name('reorder');
 
         Route::post('action', ActionController::class)
             ->middleware('throttle:'.config('xelqun-tables.routes.throttle.action'))

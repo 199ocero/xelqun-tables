@@ -2,7 +2,9 @@
 
 namespace Xelqun\Tables\Columns;
 
+use BackedEnum;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Xelqun\Tables\Columns\Concerns\IsEditable;
 use Xelqun\Tables\Columns\Contracts\Editable;
@@ -34,6 +36,14 @@ class SelectColumn extends Column implements Editable
     public function getType(): string
     {
         return 'select-column';
+    }
+
+    /**
+     * The control matches on the value, so an enum stays one here, not its label.
+     */
+    protected function formatValue(mixed $value, Model $record): mixed
+    {
+        return $value instanceof BackedEnum ? $value->value : parent::formatValue($value, $record);
     }
 
     /**

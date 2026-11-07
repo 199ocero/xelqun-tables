@@ -135,6 +135,16 @@ TextColumn::make('price')->money('USD')->summarize([Sum::make()->label('Total'),
 
 `Count` and `Range` work the same way. `defaultGroup('status')` in `boot()` puts rows under a heading for each value, and keeps a group together whatever the sort.
 
+## More table options
+
+**Query builder.** `QueryBuilder::make('rules')->constraints([...])` is a filter where people build their own rules, matching all or any. Use `TextConstraint`, `NumberConstraint`, `DateConstraint`, `BooleanConstraint` and `SelectConstraint`, with dots for a relation. Only the constraints you list can be asked about, and a rule with a bad value is skipped.
+
+**Reordering.** `reorderable('sort', fn (): bool => auth()->user()->isAdmin())` in `boot()` adds up and down buttons. It's off until the closure says yes, and both rows come through `query()`.
+
+**Layout.** `toggleable()` on a column lets the viewer hide it, and `toggleable(isHiddenByDefault: true)` starts it hidden. `contentGrid(3)` shows rows as cards. `striped()` shades every other row. `poll('10s')` keeps a table fresh.
+
+**Enums.** If a column's value is a cast enum, its `getLabel()`, `getColor()` and `getIcon()` fill in the cell. The column's own `color()`, `icon()` and `formatStateUsing()` win.
+
 ## Plugins
 
 Other packages can add columns, with the same sorting, search and links as built-in ones. A tables plugin is a forms plugin, so install one with `php artisan xelqun-forms:plugin acme/sparkline`, or build one with the [plugin guide](docs/plugins.md).

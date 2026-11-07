@@ -5,6 +5,7 @@
     "endpoints": {
         "query": "\/_xelqun\/tables\/query",
         "update": "\/_xelqun\/tables\/update",
+        "reorder": "\/_xelqun\/tables\/reorder",
         "action": "\/_xelqun\/tables\/action"
     },
     "searchable": false,
@@ -34,6 +35,12 @@
     "headerActions": [],
     "bulkActions": [],
     "maxSelectable": 1000,
+    "layout": {
+        "grid": null,
+        "striped": false,
+        "pollSeconds": null,
+        "reorderable": false
+    },
     "filters": null,
     "filterDefaults": {},
     "query": {},

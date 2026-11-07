@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Traits\Macroable;
+use UnitEnum;
 use Xelqun\Forms\Support\SafeUrl;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Summarizers\Summarizer;
@@ -58,6 +59,10 @@ abstract class Column
 
     /** @var array<int, Summarizer> */
     protected array $summarizers = [];
+
+    protected bool $isToggleable = false;
+
+    protected bool $isHiddenByDefault = false;
 
     final public function __construct(protected string $name) {}
 
@@ -231,6 +236,17 @@ abstract class Column
     {
         $this->isSearchable = $condition;
         $this->searchUsing = $query;
+
+        return $this;
+    }
+
+    /**
+     * Let the viewer hide this column. Their choice stays in their browser.
+     */
+    public function toggleable(bool $condition = true, bool $isHiddenByDefault = false): static
+    {
+        $this->isToggleable = $condition;
+        $this->isHiddenByDefault = $condition && $isHiddenByDefault;
 
         return $this;
     }
@@ -474,6 +490,8 @@ abstract class Column
             'label' => $this->getLabel(),
             'sortable' => $this->isSortable,
             ...($this->opensUrlInNewTab ? ['opensInNewTab' => true] : []),
+            ...($this->isToggleable ? ['toggleable' => true] : []),
+            ...($this->isHiddenByDefault ? ['hiddenByDefault' => true] : []),
             'props' => (object) $this->getProps(),
         ];
     }
@@ -493,8 +511,8 @@ abstract class Column
                 : $this->formatValue($state, $record),
             ...array_filter([
                 // shortcut: a list gets one color and icon, and its closure receives the array. Send one per value if a table needs that.
-                'color' => $state === null ? null : $this->evaluateForCell($this->color, $record, $state),
-                'icon' => $state === null ? null : $this->evaluateForCell($this->icon, $record, $state),
+                'color' => $state === null ? null : $this->evaluateForCell($this->color, $record, $state) ?? $this->fromEnum($state, 'getColor'),
+                'icon' => $state === null ? null : $this->evaluateForCell($this->icon, $record, $state) ?? $this->fromEnum($state, 'getIcon'),
                 'url' => SafeUrl::filter($this->evaluateForCell($this->url, $record, $state)),
                 ...$this->getCellProps($record, $state),
             ], fn (mixed $value): bool => $value !== null),
@@ -506,9 +524,15 @@ abstract class Column
      */
     protected function formatValue(mixed $value, Model $record): mixed
     {
-        return $this->formatStateUsing === null || $value === null
-            ? $value
-            : $this->evaluate($this->formatStateUsing, ['state' => $value, 'record' => $record]);
+        if ($this->formatStateUsing !== null && $value !== null) {
+            return $this->evaluate($this->formatStateUsing, ['state' => $value, 'record' => $record]);
+        }
+
+        if (! $value instanceof UnitEnum) {
+            return $value;
+        }
+
+        return method_exists($value, 'getLabel') ? $value->getLabel() : $value->name;
     }
 
     protected function evaluateForCell(mixed $value, Model $record, mixed $state): mixed
@@ -520,6 +544,14 @@ abstract class Column
      * A column named after a relation would otherwise send the whole related
      * record, which holds values nobody declared.
      */
+    /**
+     * An enum's own color or icon, when it has one.
+     */
+    private function fromEnum(mixed $state, string $method): mixed
+    {
+        return $state instanceof UnitEnum && method_exists($state, $method) ? $state->{$method}() : null;
+    }
+
     private function reduceToKeys(mixed $state): mixed
     {
         return match (true) {

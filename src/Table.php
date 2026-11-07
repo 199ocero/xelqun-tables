@@ -2,6 +2,7 @@
 
 namespace Xelqun\Tables;
 
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -35,6 +36,16 @@ use Xelqun\Tables\State\TableState;
 abstract class Table
 {
     private ?string $groupColumn = null;
+
+    private ?int $contentGridColumns = null;
+
+    private ?int $pollSeconds = null;
+
+    private bool $isStriped = false;
+
+    private ?string $reorderColumn = null;
+
+    private bool|Closure $reorderAuthorization = false;
 
     private ?string $tableId = null;
 
@@ -318,6 +329,56 @@ abstract class Table
         return $this;
     }
 
+    /**
+     * Show rows as cards, this many across on a wide screen.
+     */
+    public function contentGrid(int $columns): static
+    {
+        $this->contentGridColumns = $columns;
+
+        return $this;
+    }
+
+    /**
+     * Check for changes this often, as in '10s'.
+     */
+    public function poll(string $interval): static
+    {
+        $this->pollSeconds = (int) $interval;
+
+        return $this;
+    }
+
+    public function striped(bool $condition = true): static
+    {
+        $this->isStriped = $condition;
+
+        return $this;
+    }
+
+    /**
+     * Let rows move up and down, by a number column. Nobody can until $authorization
+     * says so. The table sorts by that column.
+     */
+    public function reorderable(string $column, bool|Closure $authorization): static
+    {
+        $this->reorderColumn = $column;
+        $this->reorderAuthorization = $authorization;
+        $this->defaultSort($column);
+
+        return $this;
+    }
+
+    public function getReorderColumn(): ?string
+    {
+        return $this->reorderColumn;
+    }
+
+    public function canReorder(): bool
+    {
+        return $this->reorderColumn !== null && (bool) value($this->reorderAuthorization);
+    }
+
     public function findSortableColumn(string $name): ?Column
     {
         return collect($this->getColumns())->first(fn (Column $column): bool => $column->isSortable() && $column->getName() === $name);
@@ -408,6 +469,7 @@ abstract class Table
             'endpoints' => [
                 'query' => route('xelqun.tables.query', absolute: false),
                 'update' => route('xelqun.tables.update', absolute: false),
+                'reorder' => route('xelqun.tables.reorder', absolute: false),
                 'action' => route('xelqun.tables.action', absolute: false),
             ],
             'searchable' => $this->isSearchable(),
@@ -416,6 +478,7 @@ abstract class Table
             'headerActions' => TableActionHost::for($this, TableActionHost::HEADER)->toActionNodes(),
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'maxSelectable' => $this->maxSelectableRecords,
+            'layout' => ['grid' => $this->contentGridColumns, 'striped' => $this->isStriped, 'pollSeconds' => $this->pollSeconds, 'reorderable' => $this->canReorder()],
             ...($this->emptyState === null ? [] : ['emptyState' => $this->emptyState]),
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),

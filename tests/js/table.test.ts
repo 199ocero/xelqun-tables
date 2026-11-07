@@ -20,7 +20,8 @@ function schema(overrides: Partial<TableSchema> = {}): TableSchema {
         pkg: '0.1.0',
         id: 'products-table',
         token: 'token',
-        endpoints: { query: '/query', update: '/update', action: '/action' },
+        endpoints: { query: '/query', update: '/update', reorder: '/reorder', action: '/action' },
+        layout: { grid: null, striped: false, pollSeconds: null, reorderable: false },
         headerActions: [],
         bulkActions: [],
         maxSelectable: 1000,
@@ -893,6 +894,66 @@ describe('selection', () => {
         await clear.trigger('click');
 
         expect(wrapper.find('[data-xq-table-bulk]').exists()).toBe(false);
+    });
+});
+
+describe('layouts', () => {
+    const layout = { grid: null, striped: false, pollSeconds: null, reorderable: false };
+    const row = { key: '1', cells: { name: { state: 'Lamp' } }, actions: [] };
+    const columns = [
+        {
+            name: 'name',
+            type: 'text-column',
+            label: 'Name',
+            sortable: false,
+            toggleable: true,
+            props: {},
+        },
+    ];
+    const render = (overrides: Partial<TableSchema>) =>
+        mount(XqTable, {
+            props: { table: schema({ columns, rows: [row], ...overrides }) },
+            global: { plugins: [createXelqunForms()] },
+        });
+
+    afterEach(() => localStorage.clear());
+
+    it('shows rows as cards', () => {
+        const wrapper = render({ layout: { ...layout, grid: 2 } });
+
+        expect(wrapper.find('[data-xq-table-grid]').text()).toContain('Lamp');
+        expect(wrapper.find('table').exists()).toBe(false);
+    });
+
+    it('offers a move for each row only on a reorderable table', () => {
+        expect(render({}).find('[aria-label="Move up"]').exists()).toBe(false);
+        expect(
+            render({ layout: { ...layout, reorderable: true } })
+                .find('[aria-label="Move up"]')
+                .exists(),
+        ).toBe(true);
+    });
+
+    it('starts with a column hidden by default, and remembers a choice', async () => {
+        const hidden = [{ ...columns[0], hiddenByDefault: true }];
+
+        expect(render({ columns: hidden }).find('tbody').text()).not.toContain('Lamp');
+
+        localStorage.setItem('xq-table-columns:products-table', '[]');
+        const wrapper = render({ columns: hidden });
+
+        await flushPromises();
+
+        expect(wrapper.find('tbody').text()).toContain('Lamp');
+    });
+
+    it('survives something else in the saved columns', async () => {
+        localStorage.setItem('xq-table-columns:products-table', 'not json');
+        const wrapper = render({});
+
+        await flushPromises();
+
+        expect(wrapper.find('tbody').text()).toContain('Lamp');
     });
 });
 

@@ -7,6 +7,8 @@ export interface TableColumn {
     type: string;
     label: string;
     sortable: boolean;
+    toggleable?: boolean;
+    hiddenByDefault?: boolean;
     opensInNewTab?: boolean;
     props: Record<string, any>;
 }
@@ -60,7 +62,13 @@ export interface TableSchema extends TableResult {
     pkg: string;
     id: string;
     token: string;
-    endpoints: { query: string; update: string; action: string };
+    endpoints: { query: string; update: string; reorder: string; action: string };
+    layout: {
+        grid: number | null;
+        striped: boolean;
+        pollSeconds: number | null;
+        reorderable: boolean;
+    };
     headerActions: TableAction[];
     bulkActions: TableAction[];
     maxSelectable: number;
