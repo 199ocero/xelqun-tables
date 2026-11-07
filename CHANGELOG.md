@@ -14,6 +14,7 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 - **Row reordering.** `reorderable('sort', fn () => ...)` adds up and down buttons.
 - **Column toggles.** `toggleable()` lets the viewer hide a column.
 - **`contentGrid()`** shows rows as cards, **`striped()`** shades every other row, and **`poll('10s')`** keeps a table fresh.
+- **Motion.** New rows ripple in, a selected row tints, and the bulk bar rises. It all follows forms' `--xq-*` tokens.
 - **Enums.** A cast enum's `getLabel()`, `getColor()` and `getIcon()` fill in the cell.
 
 ## 0.4.0 - 2026-11-06

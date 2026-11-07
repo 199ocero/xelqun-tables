@@ -83,6 +83,11 @@ const columnCount = computed(
         (schema.value.layout.reorderable ? 1 : 0),
 );
 
+/** A short ripple down the top rows. Past these, waiting for it would feel slow. */
+function staggered(index: number): { animationDelay: string } {
+    return { animationDelay: `calc(var(--xq-stagger) * ${Math.min(index, 8)})` };
+}
+
 function startsGroup(index: number): boolean {
     const row = schema.value.rows[index];
 
@@ -236,7 +241,7 @@ onMounted(() => {
         <div
             :class="
                 cn(
-                    'rounded-xq-lg border-xq-border relative overflow-x-auto border transition-opacity',
+                    'rounded-xq-lg border-xq-border relative overflow-x-auto border transition-opacity duration-(--xq-duration-base)',
                     loading && 'opacity-60',
                 )
             "
@@ -248,9 +253,10 @@ onMounted(() => {
                 data-xq-table-grid
             >
                 <article
-                    v-for="row in schema.rows"
+                    v-for="(row, index) in schema.rows"
                     :key="row.key"
-                    class="gap-2 p-4 border-xq-border bg-xq-card rounded-xq-md grid border"
+                    class="gap-2 p-4 border-xq-border bg-xq-card rounded-xq-md animate-xq-rise-in grid border"
+                    :style="staggered(index)"
                 >
                     <div v-for="column in columns" :key="column.name" class="text-sm">
                         <p class="text-xs text-xq-muted-foreground">{{ column.label }}</p>
@@ -350,10 +356,12 @@ onMounted(() => {
                         <tr
                             :class="
                                 cn(
-                                    'border-xq-border border-b last:border-b-0',
+                                    'border-xq-border animate-xq-rise-in border-b transition-colors duration-(--xq-duration-fast) last:border-b-0',
                                     row.url && 'hover:bg-xq-muted/50',
+                                    selected.has(row.key) && 'bg-xq-accent/60',
                                 )
                             "
+                            :style="staggered(index)"
                         >
                             <td v-if="schema.layout.reorderable" class="px-1 py-2">
                                 <div class="gap-0.5 grid">
