@@ -897,6 +897,72 @@ describe('selection', () => {
     });
 });
 
+describe('the gliding row highlight', () => {
+    const columns = [
+        { name: 'name', type: 'text-column', label: 'Name', sortable: false, props: {} },
+    ];
+    const rows = ['1', '2'].map((key) => ({
+        key,
+        cells: { name: { state: 'Lamp' } },
+        actions: [],
+    }));
+    const render = (overrides: Partial<TableSchema> = {}) =>
+        mount(XqTable, {
+            props: { table: schema({ columns, rows, ...overrides }) },
+            global: { plugins: [createXelqunForms()] },
+        });
+    const glide = (wrapper: ReturnType<typeof render>) => wrapper.find('[data-xq-table-glide]');
+
+    it('stays hidden until a row is hovered', () => {
+        expect(glide(render()).attributes('style')).toContain('opacity: 0');
+    });
+
+    it('appears on the first row, then slides to the next', async () => {
+        const wrapper = render();
+        const tableRows = wrapper.findAll('[data-xq-table-row]');
+
+        await tableRows[0].trigger('mouseover');
+        expect(glide(wrapper).attributes('style')).toContain('opacity: 1');
+        expect(glide(wrapper).classes().join(' ')).not.toContain('[transform');
+
+        await tableRows[1].trigger('mouseover');
+        expect(glide(wrapper).classes().join(' ')).toContain('[transform');
+    });
+
+    it('hides over the header, and when the pointer leaves', async () => {
+        const wrapper = render();
+
+        await wrapper.find('[data-xq-table-row]').trigger('mouseover');
+        await wrapper.find('thead').trigger('mouseover');
+        expect(glide(wrapper).attributes('style')).toContain('opacity: 0');
+
+        await wrapper.find('[data-xq-table-row]').trigger('mouseover');
+        await wrapper.find('[data-xq-table-scroll]').trigger('mouseleave');
+        expect(glide(wrapper).attributes('style')).toContain('opacity: 0');
+    });
+
+    it('follows the keyboard too', async () => {
+        const wrapper = render();
+
+        await wrapper.find('[data-xq-table-row]').trigger('focusin');
+
+        expect(glide(wrapper).attributes('style')).toContain('opacity: 1');
+    });
+
+    it('stays out of the way of screen readers and clicks', () => {
+        const wrapper = render();
+
+        expect(glide(wrapper).attributes('aria-hidden')).toBe('true');
+        expect(glide(wrapper).classes()).toContain('pointer-events-none');
+    });
+
+    it('has no highlight on cards', () => {
+        const layout = { grid: 2, striped: false, pollSeconds: null, reorderable: false };
+
+        expect(glide(render({ layout })).exists()).toBe(false);
+    });
+});
+
 describe('layouts', () => {
     const layout = { grid: null, striped: false, pollSeconds: null, reorderable: false };
     const row = { key: '1', cells: { name: { state: 'Lamp' } }, actions: [] };

@@ -4,6 +4,7 @@ import { cn, useRegistry, XqAction, XqActionGroup, XqButton, XqCheckbox } from '
 import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue';
+import { useRowGlide } from '../composables/useRowGlide';
 import { createTableStore } from '../core/store';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
@@ -25,6 +26,11 @@ const { schema, loading, error, selected, t } = store;
 const isSupported = computed(() =>
     (SUPPORTED_SCHEMA_VERSIONS as readonly number[]).includes(schema.value.$xq),
 );
+const { glideClass, glideStyle, glideTo, hideGlide } = useRowGlide();
+
+// New rows may not reach where the pointer is, or may sit somewhere else.
+watch(() => schema.value.rows, hideGlide);
+
 const hiddenColumnsKey = `xq-table-columns:${props.table.id}`;
 const hiddenColumns = ref(
     new Set(
@@ -245,7 +251,19 @@ onMounted(() => {
                     loading && 'opacity-60',
                 )
             "
+            data-xq-table-scroll
+            @mouseover="glideTo"
+            @focusin="glideTo"
+            @mouseleave="hideGlide"
+            @focusout="hideGlide"
         >
+            <span
+                v-if="!schema.layout.grid"
+                aria-hidden="true"
+                :class="glideClass"
+                :style="glideStyle"
+                data-xq-table-glide
+            ></span>
             <div
                 v-if="schema.layout.grid"
                 class="gap-4 p-4 md:[grid-template-columns:repeat(var(--xq-table-grid),minmax(0,1fr))] grid"
@@ -283,7 +301,7 @@ onMounted(() => {
                 v-else
                 :class="
                     cn(
-                        'text-sm w-full',
+                        'text-sm relative w-full',
                         schema.layout.striped && '[&_tbody_tr:nth-child(even)]:bg-xq-muted/40',
                     )
                 "
@@ -357,11 +375,11 @@ onMounted(() => {
                             :class="
                                 cn(
                                     'border-xq-border animate-xq-rise-in border-b transition-colors duration-(--xq-duration-fast) last:border-b-0',
-                                    row.url && 'hover:bg-xq-muted/50',
                                     selected.has(row.key) && 'bg-xq-accent/60',
                                 )
                             "
                             :style="staggered(index)"
+                            data-xq-table-row
                         >
                             <td v-if="schema.layout.reorderable" class="px-1 py-2">
                                 <div class="gap-0.5 grid">
