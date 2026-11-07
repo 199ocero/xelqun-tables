@@ -1,1 +1,10 @@
 @source "../js";
+
+/* XqTableScrollbar takes over, so a wide table shows one bar and not two. */
+[data-xq-table-scroll] {
+    scrollbar-width: none;
+}
+
+[data-xq-table-scroll]::-webkit-scrollbar {
+    display: none;
+}

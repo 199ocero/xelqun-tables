@@ -13,6 +13,8 @@ class TextColumn extends Column
 {
     protected bool $isBadge = false;
 
+    protected bool $isWrapped = false;
+
     public function getType(): string
     {
         return 'text-column';
@@ -20,7 +22,7 @@ class TextColumn extends Column
 
     protected function getProps(): array
     {
-        return $this->isBadge ? ['badge' => true] : [];
+        return array_filter(['badge' => $this->isBadge, 'wrap' => $this->isWrapped]);
     }
 
     /**
@@ -29,6 +31,16 @@ class TextColumn extends Column
     public function badge(bool $condition = true): static
     {
         $this->isBadge = $condition;
+
+        return $this;
+    }
+
+    /**
+     * Let long text run onto more lines. Cells stay on one line otherwise.
+     */
+    public function wrap(bool $condition = true): static
+    {
+        $this->isWrapped = $condition;
 
         return $this;
     }

@@ -2,6 +2,17 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Added
+
+- **`TextColumn::wrap()`** lets long text run onto more lines.
+
+### Fixed
+
+- A wide table scrolls sideways instead of wrapping its cells to fit. Cells stay on one line unless the column calls `wrap()`, and images keep their size.
+- A wide table's scrollbar stays on screen while the table is in view, and stays visible on macOS.
+
 ## 0.5.0 - 2026-11-07
 
 This release needs `xelqun/forms` 0.7. The schema version (`$xq`) stays 1.

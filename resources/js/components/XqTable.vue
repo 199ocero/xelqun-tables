@@ -16,6 +16,7 @@ import XqTableBulkBar from './XqTableBulkBar.vue';
 import XqTableColumns from './XqTableColumns.vue';
 import XqTableFilters from './XqTableFilters.vue';
 import XqTablePagination from './XqTablePagination.vue';
+import XqTableScrollbar from './XqTableScrollbar.vue';
 import XqTableSearch from './XqTableSearch.vue';
 
 const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] }>();
@@ -27,6 +28,7 @@ const isSupported = computed(() =>
     (SUPPORTED_SCHEMA_VERSIONS as readonly number[]).includes(schema.value.$xq),
 );
 const { glideClass, glideStyle, glideTo, hideGlide } = useRowGlide();
+const scroller = ref<HTMLElement>();
 
 // New rows may not reach where the pointer is, or may sit somewhere else.
 watch(() => schema.value.rows, hideGlide);
@@ -244,254 +246,276 @@ onMounted(() => {
                 :runner="store.actionRunner({ kind: 'bulk' })"
             />
         </XqTableBulkBar>
-        <div
-            :class="
-                cn(
-                    'rounded-xq-lg border-xq-border relative overflow-x-auto overflow-y-hidden border transition-opacity duration-(--xq-duration-base)',
-                    loading && 'opacity-60',
-                )
-            "
-            data-xq-table-scroll
-            @mouseover="glideTo"
-            @focusin="glideTo"
-            @mouseleave="hideGlide"
-            @focusout="hideGlide"
-        >
-            <span
-                v-if="!schema.layout.grid"
-                aria-hidden="true"
-                :class="glideClass"
-                :style="glideStyle"
-                data-xq-table-glide
-            ></span>
+        <div class="min-w-0">
             <div
-                v-if="schema.layout.grid"
-                class="gap-4 p-4 md:[grid-template-columns:repeat(var(--xq-table-grid),minmax(0,1fr))] grid"
-                :style="{ '--xq-table-grid': schema.layout.grid }"
-                data-xq-table-grid
-            >
-                <article
-                    v-for="(row, index) in schema.rows"
-                    :key="row.key"
-                    class="gap-2 p-4 border-xq-border bg-xq-card rounded-xq-md animate-xq-rise-in grid border"
-                    :style="staggered(index)"
-                >
-                    <div v-for="column in columns" :key="column.name" class="text-sm">
-                        <p class="text-xs text-xq-muted-foreground">{{ column.label }}</p>
-                        <component
-                            :is="column.cell"
-                            v-if="column.cell"
-                            :column="column"
-                            :cell="row.cells[column.name]"
-                            @update="store.updateCell(row.key, column.name, $event)"
-                        />
-                    </div>
-                    <div v-if="row.actions.length > 0" class="gap-1 flex justify-end">
-                        <component
-                            :is="action.actions ? XqActionGroup : XqAction"
-                            v-for="action in row.actions"
-                            :key="action.name"
-                            :node="actionNode(action)"
-                            :runner="store.actionRunner({ kind: 'record', record: row.key })"
-                        />
-                    </div>
-                </article>
-            </div>
-            <table
-                v-else
                 :class="
                     cn(
-                        'text-sm relative w-full',
-                        schema.layout.striped && '[&_tbody_tr:nth-child(even)]:bg-xq-muted/40',
+                        'rounded-xq-lg border-xq-border relative overflow-x-auto overflow-y-hidden border transition-opacity duration-(--xq-duration-base)',
+                        loading && 'opacity-60',
                     )
                 "
+                ref="scroller"
+                data-xq-table-scroll
+                @mouseover="glideTo"
+                @focusin="glideTo"
+                @mouseleave="hideGlide"
+                @focusout="hideGlide"
             >
-                <thead class="border-xq-border bg-xq-muted/50 border-b">
-                    <tr>
-                        <th v-if="schema.layout.reorderable" scope="col" class="w-px">
-                            <span class="sr-only">{{ t('Move up') }}</span>
-                        </th>
-                        <th v-if="hasSelection" scope="col" class="px-3 py-2 w-px">
-                            <XqCheckbox
-                                :model-value="
-                                    selectedOnPage > 0 && selectedOnPage === schema.rows.length
-                                "
-                                :indeterminate="
-                                    selectedOnPage > 0 && selectedOnPage < schema.rows.length
-                                "
-                                :aria-label="t('Select all on this page')"
-                                @update:model-value="store.togglePage($event)"
+                <span
+                    v-if="!schema.layout.grid"
+                    aria-hidden="true"
+                    :class="glideClass"
+                    :style="glideStyle"
+                    data-xq-table-glide
+                ></span>
+                <div
+                    v-if="schema.layout.grid"
+                    class="gap-4 p-4 md:[grid-template-columns:repeat(var(--xq-table-grid),minmax(0,1fr))] grid"
+                    :style="{ '--xq-table-grid': schema.layout.grid }"
+                    data-xq-table-grid
+                >
+                    <article
+                        v-for="(row, index) in schema.rows"
+                        :key="row.key"
+                        class="gap-2 p-4 border-xq-border bg-xq-card rounded-xq-md animate-xq-rise-in grid border"
+                        :style="staggered(index)"
+                    >
+                        <div v-for="column in columns" :key="column.name" class="text-sm">
+                            <p class="text-xs text-xq-muted-foreground">{{ column.label }}</p>
+                            <component
+                                :is="column.cell"
+                                v-if="column.cell"
+                                :column="column"
+                                :cell="row.cells[column.name]"
+                                @update="store.updateCell(row.key, column.name, $event)"
                             />
-                        </th>
-                        <th
-                            v-for="column in columns"
-                            :key="column.name"
-                            scope="col"
-                            :aria-sort="ariaSort(column.name)"
-                            class="px-3 py-2 font-medium text-xq-muted-foreground text-left"
-                        >
-                            <button
-                                v-if="column.sortable"
-                                type="button"
-                                class="gap-1 font-medium hover:text-xq-foreground inline-flex cursor-pointer items-center"
-                                @click="toggleSort(column.name)"
-                            >
-                                {{ column.label }}
-                                <ArrowUp
-                                    v-if="sortDirection(column.name) === 'asc'"
-                                    class="size-3.5"
-                                    aria-hidden="true"
+                        </div>
+                        <div v-if="row.actions.length > 0" class="gap-1 flex justify-end">
+                            <component
+                                :is="action.actions ? XqActionGroup : XqAction"
+                                v-for="action in row.actions"
+                                :key="action.name"
+                                :node="actionNode(action)"
+                                :runner="store.actionRunner({ kind: 'record', record: row.key })"
+                            />
+                        </div>
+                    </article>
+                </div>
+                <table
+                    v-else
+                    :class="
+                        cn(
+                            'text-sm relative w-full whitespace-nowrap',
+                            schema.layout.striped && '[&_tbody_tr:nth-child(even)]:bg-xq-muted/40',
+                        )
+                    "
+                >
+                    <thead class="border-xq-border bg-xq-muted/50 border-b">
+                        <tr>
+                            <th v-if="schema.layout.reorderable" scope="col" class="w-px">
+                                <span class="sr-only">{{ t('Move up') }}</span>
+                            </th>
+                            <th v-if="hasSelection" scope="col" class="px-3 py-2 w-px">
+                                <XqCheckbox
+                                    :model-value="
+                                        selectedOnPage > 0 && selectedOnPage === schema.rows.length
+                                    "
+                                    :indeterminate="
+                                        selectedOnPage > 0 && selectedOnPage < schema.rows.length
+                                    "
+                                    :aria-label="t('Select all on this page')"
+                                    @update:model-value="store.togglePage($event)"
                                 />
-                                <ArrowDown
-                                    v-else-if="sortDirection(column.name) === 'desc'"
-                                    class="size-3.5"
-                                    aria-hidden="true"
-                                />
-                                <ChevronsUpDown
-                                    v-else
-                                    class="size-3.5 opacity-50"
-                                    aria-hidden="true"
-                                />
-                            </button>
-                            <template v-else>{{ column.label }}</template>
-                        </th>
-                        <th v-if="hasRowActions" scope="col">
-                            <span class="sr-only">{{ t('Actions') }}</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template v-for="(row, index) in schema.rows" :key="row.key">
-                        <tr v-if="startsGroup(index)" data-xq-table-group>
+                            </th>
                             <th
-                                :colspan="columnCount"
-                                scope="colgroup"
-                                class="px-3 py-2 text-sm font-medium bg-xq-muted text-left"
+                                v-for="column in columns"
+                                :key="column.name"
+                                scope="col"
+                                :aria-sort="ariaSort(column.name)"
+                                class="px-3 py-2 font-medium text-xq-muted-foreground text-left"
                             >
-                                {{ row.group }}
+                                <button
+                                    v-if="column.sortable"
+                                    type="button"
+                                    class="gap-1 font-medium hover:text-xq-foreground inline-flex cursor-pointer items-center"
+                                    @click="toggleSort(column.name)"
+                                >
+                                    {{ column.label }}
+                                    <ArrowUp
+                                        v-if="sortDirection(column.name) === 'asc'"
+                                        class="size-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    <ArrowDown
+                                        v-else-if="sortDirection(column.name) === 'desc'"
+                                        class="size-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    <ChevronsUpDown
+                                        v-else
+                                        class="size-3.5 opacity-50"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                                <template v-else>{{ column.label }}</template>
+                            </th>
+                            <th v-if="hasRowActions" scope="col">
+                                <span class="sr-only">{{ t('Actions') }}</span>
                             </th>
                         </tr>
-                        <tr
-                            :class="
-                                cn(
-                                    'border-xq-border animate-xq-rise-in border-b transition-colors duration-(--xq-duration-fast) last:border-b-0',
-                                    selected.has(row.key) && 'bg-xq-accent/60',
-                                )
-                            "
-                            :style="staggered(index)"
-                            data-xq-table-row
-                        >
-                            <td v-if="schema.layout.reorderable" class="px-1 py-2">
-                                <div class="gap-0.5 grid">
-                                    <button
-                                        type="button"
-                                        class="text-xq-muted-foreground hover:text-xq-foreground cursor-pointer"
-                                        :aria-label="t('Move up')"
-                                        @click="store.moveRow(row.key, 'up')"
-                                    >
-                                        <ChevronUp class="size-4" aria-hidden="true" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="text-xq-muted-foreground hover:text-xq-foreground cursor-pointer"
-                                        :aria-label="t('Move down')"
-                                        @click="store.moveRow(row.key, 'down')"
-                                    >
-                                        <ChevronDown class="size-4" aria-hidden="true" />
-                                    </button>
-                                </div>
-                            </td>
-                            <td v-if="hasSelection" class="px-3 py-2">
-                                <XqCheckbox
-                                    :model-value="selected.has(row.key)"
-                                    :aria-label="t('Select row')"
-                                    @update:model-value="store.toggleRow(row.key, $event)"
-                                />
-                            </td>
-                            <td v-for="column in columns" :key="column.name" class="px-3 py-2">
-                                <component
-                                    :is="column.cell"
-                                    v-if="column.cell && column.props.editable"
-                                    :column="column"
-                                    :cell="row.cells[column.name]"
-                                    @update="store.updateCell(row.key, column.name, $event)"
-                                />
-                                <XqCellLink
-                                    v-else-if="column.cell"
-                                    :url="row.cells[column.name].url ?? row.url"
-                                    :new-tab="
-                                        row.cells[column.name].url ? column.opensInNewTab : false
+                    </thead>
+                    <tbody>
+                        <template v-for="(row, index) in schema.rows" :key="row.key">
+                            <tr v-if="startsGroup(index)" data-xq-table-group>
+                                <th
+                                    :colspan="columnCount"
+                                    scope="colgroup"
+                                    class="px-3 py-2 text-sm font-medium bg-xq-muted text-left"
+                                >
+                                    {{ row.group }}
+                                </th>
+                            </tr>
+                            <tr
+                                :class="
+                                    cn(
+                                        'border-xq-border animate-xq-rise-in border-b transition-colors duration-(--xq-duration-fast) last:border-b-0',
+                                        selected.has(row.key) && 'bg-xq-accent/60',
+                                    )
+                                "
+                                :style="staggered(index)"
+                                data-xq-table-row
+                            >
+                                <td v-if="schema.layout.reorderable" class="px-1 py-2">
+                                    <div class="gap-0.5 grid">
+                                        <button
+                                            type="button"
+                                            class="text-xq-muted-foreground hover:text-xq-foreground cursor-pointer"
+                                            :aria-label="t('Move up')"
+                                            @click="store.moveRow(row.key, 'up')"
+                                        >
+                                            <ChevronUp class="size-4" aria-hidden="true" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="text-xq-muted-foreground hover:text-xq-foreground cursor-pointer"
+                                            :aria-label="t('Move down')"
+                                            @click="store.moveRow(row.key, 'down')"
+                                        >
+                                            <ChevronDown class="size-4" aria-hidden="true" />
+                                        </button>
+                                    </div>
+                                </td>
+                                <td v-if="hasSelection" class="px-3 py-2">
+                                    <XqCheckbox
+                                        :model-value="selected.has(row.key)"
+                                        :aria-label="t('Select row')"
+                                        @update:model-value="store.toggleRow(row.key, $event)"
+                                    />
+                                </td>
+                                <td
+                                    v-for="column in columns"
+                                    :key="column.name"
+                                    :class="
+                                        cn(
+                                            'px-3 py-2',
+                                            column.props.wrap && 'min-w-60 whitespace-normal',
+                                        )
                                     "
-                                    :quiet="!row.cells[column.name].url"
-                                    :tabindex="isRepeatedRowLink(row, column.name) ? -1 : undefined"
                                 >
                                     <component
                                         :is="column.cell"
+                                        v-if="column.cell && column.props.editable"
                                         :column="column"
                                         :cell="row.cells[column.name]"
+                                        @update="store.updateCell(row.key, column.name, $event)"
                                     />
-                                </XqCellLink>
-                                <span v-else class="text-xq-destructive">
-                                    {{ t('Unknown column type: :type', { type: column.type }) }}
-                                </span>
-                            </td>
-                            <td v-if="hasRowActions" class="px-3 py-2">
-                                <div class="gap-1 flex justify-end">
-                                    <component
-                                        :is="action.actions ? XqActionGroup : XqAction"
-                                        v-for="action in row.actions"
-                                        :key="action.name"
-                                        :node="actionNode(action)"
-                                        :runner="
-                                            store.actionRunner({ kind: 'record', record: row.key })
+                                    <XqCellLink
+                                        v-else-if="column.cell"
+                                        :url="row.cells[column.name].url ?? row.url"
+                                        :new-tab="
+                                            row.cells[column.name].url
+                                                ? column.opensInNewTab
+                                                : false
                                         "
-                                    />
-                                </div>
+                                        :quiet="!row.cells[column.name].url"
+                                        :tabindex="
+                                            isRepeatedRowLink(row, column.name) ? -1 : undefined
+                                        "
+                                    >
+                                        <component
+                                            :is="column.cell"
+                                            :column="column"
+                                            :cell="row.cells[column.name]"
+                                        />
+                                    </XqCellLink>
+                                    <span v-else class="text-xq-destructive">
+                                        {{ t('Unknown column type: :type', { type: column.type }) }}
+                                    </span>
+                                </td>
+                                <td v-if="hasRowActions" class="px-3 py-2">
+                                    <div class="gap-1 flex justify-end">
+                                        <component
+                                            :is="action.actions ? XqActionGroup : XqAction"
+                                            v-for="action in row.actions"
+                                            :key="action.name"
+                                            :node="actionNode(action)"
+                                            :runner="
+                                                store.actionRunner({
+                                                    kind: 'record',
+                                                    record: row.key,
+                                                })
+                                            "
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr v-if="schema.rows.length === 0">
+                            <td
+                                :colspan="
+                                    columns.length +
+                                    (hasRowActions ? 1 : 0) +
+                                    (hasSelection ? 1 : 0)
+                                "
+                                class="px-3 py-8 text-xq-muted-foreground text-center whitespace-normal"
+                            >
+                                <template v-if="schema.emptyState">
+                                    <p class="font-medium text-xq-foreground">
+                                        {{ schema.emptyState.heading }}
+                                    </p>
+                                    <p v-if="schema.emptyState.description" class="mt-1">
+                                        {{ schema.emptyState.description }}
+                                    </p>
+                                </template>
+                                <template v-else>{{ t('No records found.') }}</template>
                             </td>
                         </tr>
-                    </template>
-                    <tr v-if="schema.rows.length === 0">
-                        <td
-                            :colspan="
-                                columns.length + (hasRowActions ? 1 : 0) + (hasSelection ? 1 : 0)
-                            "
-                            class="px-3 py-8 text-xq-muted-foreground text-center"
-                        >
-                            <template v-if="schema.emptyState">
-                                <p class="font-medium text-xq-foreground">
-                                    {{ schema.emptyState.heading }}
-                                </p>
-                                <p v-if="schema.emptyState.description" class="mt-1">
-                                    {{ schema.emptyState.description }}
-                                </p>
-                            </template>
-                            <template v-else>{{ t('No records found.') }}</template>
-                        </td>
-                    </tr>
-                </tbody>
-                <tfoot v-if="Object.keys(schema.summaries).length > 0" data-xq-table-summary>
-                    <tr class="border-xq-border border-t">
-                        <td v-if="schema.layout.reorderable"></td>
-                        <td v-if="hasSelection"></td>
-                        <td
-                            v-for="column in columns"
-                            :key="column.name"
-                            class="px-3 py-2 text-sm font-medium align-top"
-                        >
-                            <p
-                                v-for="(line, position) in schema.summaries[column.name]"
-                                :key="position"
+                    </tbody>
+                    <tfoot v-if="Object.keys(schema.summaries).length > 0" data-xq-table-summary>
+                        <tr class="border-xq-border border-t">
+                            <td v-if="schema.layout.reorderable"></td>
+                            <td v-if="hasSelection"></td>
+                            <td
+                                v-for="column in columns"
+                                :key="column.name"
+                                class="px-3 py-2 text-sm font-medium align-top"
                             >
-                                <span v-if="line.label" class="text-xq-muted-foreground">
-                                    {{ line.label }}:
-                                </span>
-                                {{ line.value }}
-                            </p>
-                        </td>
-                        <td v-if="hasRowActions"></td>
-                    </tr>
-                </tfoot>
-            </table>
+                                <p
+                                    v-for="(line, position) in schema.summaries[column.name]"
+                                    :key="position"
+                                >
+                                    <span v-if="line.label" class="text-xq-muted-foreground">
+                                        {{ line.label }}:
+                                    </span>
+                                    {{ line.value }}
+                                </p>
+                            </td>
+                            <td v-if="hasRowActions"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <XqTableScrollbar :target="scroller" />
         </div>
         <XqTablePagination
             v-if="schema.pagination.total > 0"

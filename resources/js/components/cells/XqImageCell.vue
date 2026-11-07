@@ -20,7 +20,12 @@ const sources = computed<string[]>(() =>
             :width="column.props.size"
             :height="column.props.size"
             loading="lazy"
-            :class="cn('object-cover', column.props.circular ? 'rounded-full' : 'rounded-xq-sm')"
+            :class="
+                cn(
+                    'max-w-none object-cover',
+                    column.props.circular ? 'rounded-full' : 'rounded-xq-sm',
+                )
+            "
             :style="{ width: `${column.props.size}px`, height: `${column.props.size}px` }"
         />
     </span>

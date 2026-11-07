@@ -47,7 +47,7 @@ it('keeps the shape of every column', function (Column $column) {
     expect(json_encode(['column' => $schema['columns'], 'cell' => $schema['rows'][0]['cells']], JSON_PRETTY_PRINT))->toMatchSnapshot();
 })->with([
     'text' => fn () => TextColumn::make('name'),
-    'text in full' => fn () => TextColumn::make('name')->badge()->color('success')->icon('star')->url('/products', openInNewTab: true),
+    'text in full' => fn () => TextColumn::make('name')->badge()->wrap()->color('success')->icon('star')->url('/products', openInNewTab: true),
     'money' => fn () => TextColumn::make('price')->money('USD', 'en'),
     'date' => fn () => TextColumn::make('created_at')->date(),
     'icon' => fn () => IconColumn::make('name')->icon('star')->color('primary'),

@@ -58,6 +58,78 @@ afterEach(() => {
 describe('XqTable', () => {
     const paged = { page: 1, perPage: 1, total: 3, lastPage: 3, options: [1, 2] };
 
+    it('shows a scrollbar for a wide table and keeps it in step with the table', async () => {
+        let resized = (): void => {};
+
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                constructor(callback: () => void) {
+                    resized = callback;
+                }
+
+                observe(): void {}
+
+                disconnect(): void {}
+            },
+        );
+
+        const wrapper = mount(XqTable, { props: { table: schema() } });
+        const table = wrapper.find<HTMLElement>('[data-xq-table-scroll]');
+        const bar = wrapper.find<HTMLElement>('[data-xq-table-scrollbar]');
+
+        expect(bar.attributes('tabindex')).toBe('-1');
+
+        await flushPromises();
+        Object.defineProperty(table.element, 'scrollWidth', { value: 500, configurable: true });
+        Object.defineProperty(table.element, 'clientWidth', { value: 500, configurable: true });
+        resized();
+        await flushPromises();
+
+        expect(bar.element.style.display).toBe('none');
+
+        Object.defineProperty(table.element, 'scrollWidth', { value: 900 });
+        resized();
+        await flushPromises();
+
+        expect(bar.element.style.display).toBe('');
+        expect(bar.find('div').element.style.width).toBe('900px');
+
+        bar.element.scrollLeft = 120;
+        await bar.trigger('scroll');
+        expect(table.element.scrollLeft).toBe(120);
+
+        table.element.scrollLeft = 40;
+        await table.trigger('scroll');
+        expect(bar.element.scrollLeft).toBe(40);
+    });
+
+    it('wraps only the cells of a column that asks for it', () => {
+        const column = { type: 'text-column', label: 'Label', sortable: false };
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    columns: [
+                        { ...column, name: 'name', props: {} },
+                        { ...column, name: 'notes', props: { wrap: true } },
+                    ],
+                    rows: [
+                        {
+                            key: '1',
+                            cells: { name: { state: 'Lamp' }, notes: { state: 'Long' } },
+                            actions: [],
+                        },
+                    ],
+                }),
+            },
+        });
+        const [plain, wrapped] = wrapper.findAll('[data-xq-table-row] td');
+
+        expect(wrapper.find('table').classes()).toContain('whitespace-nowrap');
+        expect(plain!.classes()).not.toContain('whitespace-normal');
+        expect(wrapped!.classes()).toContain('whitespace-normal');
+    });
+
     it('asks for the next page and puts it in the url', async () => {
         const fetchMock = respondWith({
             query: { page: 2 },

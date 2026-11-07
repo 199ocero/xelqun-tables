@@ -137,6 +137,8 @@ TextColumn::make('price')->money('USD')->summarize([Sum::make()->label('Total'),
 
 ## More table options
 
+**Long text.** Cells stay on one line and a wide table scrolls sideways. `TextColumn::make('description')->wrap()` lets a column's text run onto more lines instead.
+
 **Query builder.** `QueryBuilder::make('rules')->constraints([...])` is a filter where people build their own rules, matching all or any. Use `TextConstraint`, `NumberConstraint`, `DateConstraint`, `BooleanConstraint` and `SelectConstraint`, with dots for a relation. Only the constraints you list can be asked about, and a rule with a bad value is skipped.
 
 **Reordering.** `reorderable('sort', fn (): bool => auth()->user()->isAdmin())` in `boot()` adds up and down buttons. It's off until the closure says yes, and both rows come through `query()`.
