@@ -3,6 +3,7 @@
 namespace Xelqun\Tables\Actions;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
@@ -42,13 +43,17 @@ final class TableActionHost extends ActionSet
      */
     public static function for(Table $table, string $kind, ?Model $record = null, array $selection = []): self
     {
-        return self::make($record, [
+        $host = new self($record, [
             'table' => $table::class,
             'tableContext' => $table->getContext(),
             'tableId' => $table->getId(),
             'kind' => $kind,
             'selection' => $selection,
         ]);
+        // The same table, not one built again from its context for every row.
+        $host->table = $table;
+
+        return $host->fill();
     }
 
     public function actions(): array
@@ -77,6 +82,21 @@ final class TableActionHost extends ActionSet
     public function getSelectedRecords(): Collection
     {
         return $this->selectedRecords ??= $this->getTable()->resolveRecords((array) ($this->context['selection'] ?? []));
+    }
+
+    /**
+     * The selection as a query, which loads nothing until it runs.
+     *
+     * @return Builder<covariant Model>
+     */
+    public function getSelectedQuery(): Builder
+    {
+        return $this->getTable()->queryRecords((array) ($this->context['selection'] ?? []));
+    }
+
+    public function hasSelection(): bool
+    {
+        return ($this->context['selection'] ?? []) !== [];
     }
 
     /**

@@ -12,10 +12,34 @@ const bar = ref<HTMLElement>();
 const contentWidth = ref(0);
 const isOverflowing = ref(false);
 
+/**
+ * Each side copies the other, and its scroll event arrives a frame later. The
+ * position each was given is kept, so that echo is ignored and not copied back,
+ * which would pull the other side to where it was a frame ago.
+ */
+let tableSetTo: number | null = null;
+let barSetTo: number | null = null;
+
+function isEcho(element: HTMLElement, setTo: number | null): boolean {
+    return setTo !== null && Math.abs(element.scrollLeft - setTo) < 1;
+}
+
 function scrollTable(): void {
-    if (props.target && bar.value) {
-        props.target.scrollLeft = bar.value.scrollLeft;
+    const target = props.target;
+
+    if (!target || !bar.value) {
+        return;
     }
+
+    if (isEcho(bar.value, barSetTo)) {
+        barSetTo = null;
+
+        return;
+    }
+
+    target.scrollLeft = bar.value.scrollLeft;
+    // Read back, because the two ends aren't quite the same width and it can stop short.
+    tableSetTo = target.scrollLeft;
 }
 
 watch(
@@ -26,9 +50,18 @@ watch(
         }
 
         const followTable = (): void => {
-            if (bar.value) {
-                bar.value.scrollLeft = target.scrollLeft;
+            if (!bar.value) {
+                return;
             }
+
+            if (isEcho(target, tableSetTo)) {
+                tableSetTo = null;
+
+                return;
+            }
+
+            bar.value.scrollLeft = target.scrollLeft;
+            barSetTo = bar.value.scrollLeft;
         };
 
         // The table changes size on its own, as columns are toggled or rows load.

@@ -55,6 +55,7 @@ export interface TableResult {
     sort: string | null;
     activeFilters: number;
     summaries: Record<string, Array<{ label: string | null; value: unknown }>>;
+    bulkActions: TableAction[];
     rows: TableRow[];
     pagination: TablePagination;
 }
@@ -72,7 +73,6 @@ export interface TableSchema extends TableResult {
         reorderable: boolean;
     };
     headerActions: TableAction[];
-    bulkActions: TableAction[];
     maxSelectable: number;
     emptyState?: { heading: string; description: string | null };
     searchable: boolean;

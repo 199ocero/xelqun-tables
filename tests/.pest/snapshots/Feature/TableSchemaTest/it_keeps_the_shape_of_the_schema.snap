@@ -33,7 +33,6 @@
         }
     ],
     "headerActions": [],
-    "bulkActions": [],
     "maxSelectable": 1000,
     "layout": {
         "grid": null,
@@ -46,6 +45,7 @@
     "query": {},
     "sort": null,
     "activeFilters": 0,
+    "bulkActions": [],
     "summaries": [],
     "rows": [
         {

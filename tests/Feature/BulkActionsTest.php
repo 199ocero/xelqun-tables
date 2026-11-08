@@ -3,7 +3,9 @@
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Testing\TestResponse;
 use Xelqun\Forms\Components\TextInput;
@@ -68,6 +70,11 @@ class BulkTable extends Table
                 ->authorize(fn (Collection $records): bool => $records->every(fn (Product $product): bool => $product->price < 10))
                 ->action(fn () => self::$calls[] = 'by_closure'),
             BulkAction::make('denied')->action(fn () => self::$calls[] = 'denied'),
+            BulkAction::make('chunked')
+                ->authorize('delete')
+                ->action(function (Builder $query) {
+                    self::$calls[] = $query->pluck('name')->sort()->values()->all();
+                }),
         ];
     }
 }
@@ -90,7 +97,7 @@ beforeEach(function () {
 it('offers its bulk actions and its limit', function () {
     $schema = json_decode(json_encode(BulkTable::make()->toSchema()), true);
 
-    expect(array_column($schema['bulkActions'], 'name'))->toBe(['collect', 'rename', 'remove', 'by_closure'])
+    expect(array_column($schema['bulkActions'], 'name'))->toBe(['collect', 'rename', 'remove', 'by_closure', 'chunked'])
         ->and($schema['maxSelectable'])->toBe(3);
 });
 
@@ -102,6 +109,23 @@ it('gives the closure the selected rows', function () {
     $this->runBulkTableAction(BulkTable::make(), 'collect', [$first->id, $third->id])->assertOk();
 
     expect(BulkTable::$calls)->toBe([['A', 'C']]);
+});
+
+it('gives a closure that asks for it the selection as a query, and loads no rows for it', function () {
+    Gate::define('delete', fn (?User $user, Product $product): bool => true);
+    $first = liveRow('A');
+    liveRow('B');
+    $outside = Product::create(['name' => 'Outside', 'status' => 'private']);
+    $loaded = 0;
+    DB::listen(function (QueryExecuted $query) use (&$loaded): void {
+        $loaded += str_starts_with($query->sql, 'select * from "products"') ? 1 : 0;
+    });
+
+    $this->runBulkTableAction(BulkTable::make(), 'chunked', [$first->id, $outside->id])->assertOk();
+
+    // The policy check walks the rows once; nothing loads them all for the closure.
+    expect(BulkTable::$calls)->toBe([['A']])
+        ->and($loaded)->toBe(1);
 });
 
 it('skips a row outside the table\'s query', function () {

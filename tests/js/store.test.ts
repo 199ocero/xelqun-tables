@@ -35,6 +35,7 @@ function result(page: number): TableResult {
         sort: null,
         activeFilters: 0,
         summaries: {},
+        bulkActions: [],
         rows: [],
         pagination: { ...pagination, page },
     };

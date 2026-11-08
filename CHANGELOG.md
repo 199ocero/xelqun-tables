@@ -2,6 +2,22 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Added
+
+- A bulk action's closures can take `$query`: the selected rows as a query, still inside the table's query, loaded only as you go through them. Use it with `chunkById()` or `update()` when `maxSelectableRecords` is high.
+
+### Changed
+
+- `$records` is only loaded for a closure that asks for it, and a policy in `authorize()` checks the selection one row at a time. A 100,000-row selection run through `$query` peaks around 17 MB over the app instead of about 300 MB.
+- `bulkActions` comes with every query result, not only the first render, so the server can change which bulk actions show as filters change.
+- A row's actions reuse the table they belong to rather than building it again for each row.
+
+### Fixed
+
+- Dragging the sticky scrollbar, or scrolling the table sideways, no longer jitters. Each side used to copy the other's late scroll event back and pull it a frame behind.
+
 ## 0.6.0 - 2026-11-08
 
 This release needs `xelqun/forms` 0.8. The schema version (`$xq`) stays 1.

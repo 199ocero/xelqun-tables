@@ -102,6 +102,16 @@ describe('XqTable', () => {
         table.element.scrollLeft = 40;
         await table.trigger('scroll');
         expect(bar.element.scrollLeft).toBe(40);
+
+        // Dragging on before the table's own scroll event arrives doesn't pull the bar back.
+        bar.element.scrollLeft = 200;
+        await bar.trigger('scroll');
+        bar.element.scrollLeft = 260;
+        await table.trigger('scroll');
+        expect(bar.element.scrollLeft).toBe(260);
+
+        await bar.trigger('scroll');
+        expect(table.element.scrollLeft).toBe(260);
     });
 
     it('wraps only the cells of a column that asks for it', () => {

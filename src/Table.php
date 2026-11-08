@@ -220,6 +220,19 @@ abstract class Table
      */
     public function resolveRecords(array $keys): Collection
     {
+        // Nothing selected needs no query.
+        return $keys === [] ? $this->query()->getModel()->newCollection() : $this->queryRecords($keys)->get();
+    }
+
+    /**
+     * The same rows as resolveRecords(), as a query, so a big selection can be
+     * worked through in chunks rather than loaded at once.
+     *
+     * @param  array<int, mixed>  $keys
+     * @return Builder<covariant Model>
+     */
+    public function queryRecords(array $keys): Builder
+    {
         $query = $this->query();
         $model = $query->getModel();
         $keys = array_values(array_unique(array_filter(
@@ -227,13 +240,7 @@ abstract class Table
             fn (mixed $key): bool => is_scalar($key) && ($model->getKeyType() !== 'int' || ctype_digit((string) $key)),
         )));
 
-        if ($keys === []) {
-            return $model->newCollection();
-        }
-
-        return $query
-            ->withGlobalScope('xelqun-records', fn (Builder $scoped): Builder => $scoped->whereKey($keys))
-            ->get();
+        return $query->withGlobalScope('xelqun-records', fn (Builder $scoped): Builder => $scoped->whereKey($keys));
     }
 
     /**
@@ -495,7 +502,6 @@ abstract class Table
             ...$this->getClientMessages(),
             'columns' => array_map(fn (Column $column): array => $column->toDefinition(), $this->getColumns()),
             'headerActions' => TableActionHost::for($this, TableActionHost::HEADER)->toActionNodes(),
-            'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'maxSelectable' => $this->maxSelectableRecords,
             'layout' => ['grid' => $this->contentGridColumns, 'striped' => $this->isStriped, 'pollSeconds' => $this->pollSeconds, 'reorderable' => $this->canReorder()],
             ...($this->emptyState === null ? [] : ['emptyState' => $this->emptyState]),
@@ -510,7 +516,7 @@ abstract class Table
      *
      * @internal
      *
-     * @return array{query: object, sort: string|null, activeFilters: int, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
+     * @return array{query: object, sort: string|null, activeFilters: int, bulkActions: array<int, mixed>, rows: array<int, array<string, mixed>>, pagination: array<string, mixed>}
      */
     public function toResult(TableState $state): array
     {
@@ -527,6 +533,8 @@ abstract class Table
             'query' => (object) $state->toQuery($this),
             'sort' => $state->sort,
             'activeFilters' => count($this->getActiveFilters($state)),
+            // Here and not in the first render, so a filter can change which bulk actions make sense.
+            'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'summaries' => $this->getSummaries($state),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
