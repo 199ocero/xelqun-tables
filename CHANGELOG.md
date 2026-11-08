@@ -6,6 +6,7 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 
 ### Changed
 
+- **Icons come from `@lucide/vue`**, the new name of the deprecated `lucide-vue-next`.
 - **`xelqun-tables:install` sets up forms too.** It installs both npm packages and runs `xelqun-forms:install`, so the plugin, the forms stylesheet (which holds the theme tokens) and the Vite setting are in place. Before, badges and the filters panel rendered unstyled after a tables-only install.
 - **Query builder rules keep each kind of value in its own field.** Text and numbers stay in `value`, a `SelectConstraint` with options uses a select called `option`, and a `DateConstraint` uses a date picker called `date`. A `BooleanConstraint` asks for no value. A saved URL that holds a select or date rule in `value` no longer applies it.
 - **`poll()` takes seconds or minutes**, as in `'10s'` or `'1m'`, and throws on anything else. `'1m'` used to poll every second.
@@ -25,7 +26,7 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 - A query builder rule only counts as an active filter when it filters something.
 - The filters panel fits the screen and scrolls, so Apply stays in reach as rules are added.
 - Polling waits while someone types in a cell or has a dialog open, instead of wiping what they typed.
-- A refused action says "You aren't allowed to do that.", and Retry only shows for a table that failed to load.
+- A refused action says 'You are not allowed to do that.', and Retry only shows for a table that failed to load.
 - Big tables are faster: a change to one cell or one selection renders only that row, and the row highlight measures at most once a frame. A filter's options load once per request instead of twice.
 - The first row can't move up and the last can't move down, and each row's move buttons and checkbox say which row they belong to.
 

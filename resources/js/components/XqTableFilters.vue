@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useXqForm, XqBadge, XqButton, XqForm, XqPopover } from '@xelqun/forms';
 import type { FormSchema, FormStore } from '@xelqun/forms';
-import { ListFilter } from 'lucide-vue-next';
+import { ListFilter } from '@lucide/vue';
 import { ref, watch } from 'vue';
 import type { TableStore } from '../core/store';
 

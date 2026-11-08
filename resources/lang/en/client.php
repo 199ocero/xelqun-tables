@@ -39,5 +39,5 @@ return [
     'This table has expired. Reload the page to continue.' => 'This table has expired. Reload the page to continue.',
     'This table needs a newer version of @xelqun/tables.' => 'This table needs a newer version of @xelqun/tables.',
     'Unknown column type: :type' => 'Unknown column type: :type',
-    "You aren't allowed to do that." => "You aren't allowed to do that.",
+    'You are not allowed to do that.' => 'You are not allowed to do that.',
 ];

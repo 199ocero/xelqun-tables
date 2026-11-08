@@ -45,7 +45,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
 
         return t(
             failure instanceof HttpError && failure.status === 403
-                ? "You aren't allowed to do that."
+                ? 'You are not allowed to do that.'
                 : fallback,
         );
     }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { cn, XqAction, XqActionGroup, XqCheckbox } from '@xelqun/forms';
-import { ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { ChevronDown, ChevronUp } from '@lucide/vue';
 import type { Component } from 'vue';
 import { computed } from 'vue';
 import type { TableStore } from '../core/store';

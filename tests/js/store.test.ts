@@ -344,7 +344,7 @@ describe('table store', () => {
         await store.actionRunner({ kind: 'bulk' }).runAction(node as any);
 
         expect(store.selected.value.size).toBe(1);
-        expect(store.error.value).toBe("You aren't allowed to do that.");
+        expect(store.error.value).toBe('You are not allowed to do that.');
         expect(store.canRetry.value).toBe(false);
     });
 

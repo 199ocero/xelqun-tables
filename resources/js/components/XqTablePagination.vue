@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { XqButton, XqSelect } from '@xelqun/forms';
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight } from '@lucide/vue';
 import { computed } from 'vue';
 import type { TableStore } from '../core/store';
 import type { TablePagination } from '../schema/types';

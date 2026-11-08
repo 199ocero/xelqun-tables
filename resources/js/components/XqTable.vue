@@ -9,7 +9,7 @@ import {
     XqCheckbox,
     XqSelect,
 } from '@xelqun/forms';
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from '@lucide/vue';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue';
 import { useRowGlide } from '../composables/useRowGlide';

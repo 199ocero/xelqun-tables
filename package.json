@@ -27,7 +27,7 @@
         "types:check": "vue-tsc --noEmit"
     },
     "dependencies": {
-        "lucide-vue-next": "^1.0.0"
+        "@lucide/vue": "^1.17.0"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^3.0.0",

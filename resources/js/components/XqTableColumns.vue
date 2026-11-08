@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { XqCheckbox, XqPopover } from '@xelqun/forms';
-import { Columns3 } from 'lucide-vue-next';
+import { Columns3 } from '@lucide/vue';
 import type { TableColumn } from '../schema/types';
 
 defineProps<{ columns: TableColumn[]; hidden: Set<string>; t: (text: string) => string }>();
