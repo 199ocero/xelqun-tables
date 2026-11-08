@@ -15,6 +15,7 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 ### Added
 
 - **`SelectFilter::relationship()->searchable()`** searches the related records on the server, so a long list never reaches the page.
+- A relationship `SelectFilter` with more than 500 related records searches on the server even without `searchable()`.
 - In card layout, a **Sort by** menu replaces the column headers.
 
 ### Fixed

@@ -227,6 +227,15 @@ it('searches a related list on the server instead of sending it', function () {
         ->assertJsonPath('options', [['value' => $wanted->id, 'label' => 'Wanted']]);
 });
 
+it('searches a long related list on the server even when not asked to', function () {
+    Category::query()->insert(array_map(fn (int $index): array => ['name' => "Category {$index}"], range(1, Select::PRELOAD_LIMIT + 1)));
+
+    $node = json_decode(json_encode(collect(FilteredTable::make()->toSchema()['filters']['components'])->firstWhere('path', 'data.category')), true);
+
+    expect($node['props']['async'])->toBeTrue()
+        ->and($node['props']['options'])->toBe([]);
+});
+
 it('tells yes, no and either apart', function () {
     Product::create(['name' => 'Featured', 'is_featured' => true]);
     Product::create(['name' => 'Plain', 'is_featured' => false]);

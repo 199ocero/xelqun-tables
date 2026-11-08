@@ -80,18 +80,27 @@ class SelectFilter extends BaseFilter
             ->searchable($this->isSearchable)
             ->default($this->default);
 
-        if ($this->relationship === null || ! $this->isSearchable) {
+        if ($this->relationship === null || ! ($this->isSearchable || $this->hasTooManyRecords())) {
             return [$select->options(fn (): array => $this->getOptions())];
         }
 
         // Searched on the server, so a long list of related records never reaches the page.
         return [$select
+            ->searchable()
             ->getSearchResultsUsing(fn (string $search): array => $this->getRelatedQuery()
                 ->whereLike($this->titleAttribute, '%'.$search.'%')
                 ->limit(50)
                 ->pluck($this->titleAttribute, $this->getRelatedQuery()->getModel()->getKeyName())
                 ->all())
             ->getOptionLabelUsing(fn (mixed $value): mixed => $this->getRelatedQuery()->whereKey($value)->value($this->titleAttribute))];
+    }
+
+    /**
+     * Like a relationship select in a form, a list past the limit is searched on the server.
+     */
+    private function hasTooManyRecords(): bool
+    {
+        return $this->getRelatedQuery()->toBase()->offset(Select::PRELOAD_LIMIT)->limit(1)->exists();
     }
 
     /**
