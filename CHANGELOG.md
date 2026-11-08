@@ -2,7 +2,9 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
-## Unreleased
+## 0.6.1 - 2026-11-08
+
+The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.6.1`. With `xelqun/panels`, this is what hides restore and force delete from a selection while deleted rows are hidden.
 
 ### Added
 
