@@ -666,9 +666,11 @@ abstract class Table
         if ($this->groupColumn !== null) {
             // Ahead of any sort, so a group's rows stay together.
             $orders = $query->getQuery()->orders ?? [];
+            $orderBindings = $query->getQuery()->bindings['order'];
             $query->reorder();
             $this->applyGroupOrder($query);
             $query->getQuery()->orders = [...$query->getQuery()->orders ?? [], ...$orders];
+            $query->getQuery()->bindings['order'] = [...$query->getQuery()->bindings['order'], ...$orderBindings];
         }
 
         // Rows with equal values have no order of their own, so they could repeat across pages.

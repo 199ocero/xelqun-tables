@@ -24,7 +24,7 @@
         "illuminate/database": "^13.0",
         "illuminate/http": "^13.0",
         "illuminate/support": "^13.0",
-        "xelqun/forms": "^0.7"
+        "xelqun/forms": "^0.8"
     },
     "require-dev": {
         "larastan/larastan": "^3.9",

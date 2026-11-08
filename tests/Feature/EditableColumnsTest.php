@@ -23,6 +23,14 @@ use Xelqun\Tables\Table;
 use Xelqun\Tables\Tests\Fixtures\Category;
 use Xelqun\Tables\Tests\Fixtures\Product;
 
+class BoundSelectTable extends EditableTable
+{
+    public function query(): Builder
+    {
+        return parent::query()->select('products.*')->selectRaw('? as tag', ['nope']);
+    }
+}
+
 class EditableTable extends Table
 {
     /** @var array<int, Column> */
@@ -219,6 +227,13 @@ describe('summaries', function () {
             ->and($aggregateQueries)->toBe(3);
     });
 
+    it('keeps the query\'s bindings in place when it selects with one', function () {
+        Product::create(['name' => 'Gone', 'status' => 'hidden', 'price' => 99]);
+        EditableTable::$columns = [TextColumn::make('price')->summarize(Sum::make())];
+
+        expect(BoundSelectTable::make()->toResult(TableState::from([], BoundSelectTable::make()))['summaries']['price'][0]['value'])->toEqual(40);
+    });
+
     it('formats like the column', function () {
         EditableTable::$columns = [TextColumn::make('price')->money('USD')->summarize(Sum::make())];
 
@@ -270,6 +285,16 @@ describe('grouping', function () {
 
         EditableTable::make()->toSchema();
     })->throws(TableDefinitionException::class);
+
+    it('keeps a sort\'s bindings when grouped', function () {
+        Product::create(['name' => 'Bee', 'status' => 'draft']);
+        EditableTable::$columns = [TextColumn::make('name')->sortable(query: fn (Builder $query, string $direction) => $query->orderByRaw('case when name = ? then 0 else 1 end', ['Bee'])), TextColumn::make('status')];
+        EditableTable::$group = 'status';
+
+        $table = EditableTable::make();
+
+        expect(collect($table->toResult(TableState::from(['sort' => 'name'], $table))['rows'])->pluck('cells.name.state')->all())->toBe(['Bee', 'Lamp']);
+    });
 
     it('labels rows only when grouped', function () {
         EditableTable::$columns = [TextColumn::make('name')];

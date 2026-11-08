@@ -300,8 +300,14 @@ abstract class Column
     private function runAggregates(Builder $query, string $attribute): array
     {
         $base = (clone $query)->reorder()->toBase();
-        // Selected columns next to aggregates would fail on databases that check grouping.
-        $base->columns = null;
+
+        // Laravel wraps such a query before it aggregates, so each summarizer does it on its own.
+        if ($base->havings !== null || $base->unions !== null) {
+            return [];
+        }
+
+        // The selected columns go with their bindings, or later bindings would land in the wrong place.
+        $base = $base->cloneWithout(['columns'])->cloneWithoutBindings(['select']);
         $column = $base->getGrammar()->wrap($attribute);
         $selects = [];
 

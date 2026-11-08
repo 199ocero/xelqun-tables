@@ -6,23 +6,26 @@ use Xelqun\Tables\Http\Controllers\QueryController;
 use Xelqun\Tables\Http\Controllers\ReorderController;
 use Xelqun\Tables\Http\Controllers\UpdateController;
 
+// Each route counts on its own. A named limiter or a bare number is used as it is, because Laravel takes no key with it.
+$throttle = fn (string $limit, string $key): string => 'throttle:'.(str_contains($limit, ',') ? "{$limit},{$key}" : $limit);
+
 Route::prefix(config('xelqun-tables.routes.prefix'))
     ->middleware(config('xelqun-tables.routes.middleware'))
     ->name('xelqun.tables.')
-    ->group(function (): void {
+    ->group(function () use ($throttle): void {
         Route::post('query', QueryController::class)
-            ->middleware('throttle:'.config('xelqun-tables.routes.throttle.query').',xelqun-tables-query')
+            ->middleware($throttle(config('xelqun-tables.routes.throttle.query'), 'xelqun-tables-query'))
             ->name('query');
 
         Route::post('update', UpdateController::class)
-            ->middleware('throttle:'.config('xelqun-tables.routes.throttle.update', '120,1').',xelqun-tables-update')
+            ->middleware($throttle(config('xelqun-tables.routes.throttle.update', '120,1'), 'xelqun-tables-update'))
             ->name('update');
 
         Route::post('reorder', ReorderController::class)
-            ->middleware('throttle:'.config('xelqun-tables.routes.throttle.update', '120,1').',xelqun-tables-reorder')
+            ->middleware($throttle(config('xelqun-tables.routes.throttle.update', '120,1'), 'xelqun-tables-reorder'))
             ->name('reorder');
 
         Route::post('action', ActionController::class)
-            ->middleware('throttle:'.config('xelqun-tables.routes.throttle.action').',xelqun-tables-action')
+            ->middleware($throttle(config('xelqun-tables.routes.throttle.action'), 'xelqun-tables-action'))
             ->name('action');
     });

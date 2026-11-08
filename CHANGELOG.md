@@ -2,7 +2,13 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
-## Unreleased
+## 0.6.0 - 2026-11-08
+
+This release needs `xelqun/forms` 0.8. The schema version (`$xq`) stays 1.
+
+### Upgrading
+
+Update both halves together: `composer update xelqun/tables xelqun/forms` and `npm install @xelqun/tables@0.6.0 @xelqun/forms@0.8.0`. A saved URL with a query builder rule on a select or date constraint keeps its value under `value`, which no longer applies; the rule has to be made again.
 
 ### Changed
 
@@ -23,6 +29,7 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 - Each table endpoint has its own rate limit. They shared one counter per user, so 60 searches or polls in a minute blocked every action and edit.
 - A `searchable(query:)` closure that starts with `where()` no longer narrows the search on every other column.
 - `defaultGroup()` on a related column, such as `category.name`, keeps each group's rows together. A related group with no matching column throws a `TableDefinitionException`.
+- A grouped table keeps the bindings of its sort, so a sort closure with `orderByRaw(..., [$value])` orders correctly.
 - `TernaryFilter` reads `true` and `false`, and `default(false)` works.
 - A query builder rule only counts as an active filter when it filters something.
 - The filters panel fits the screen and scrolls, so Apply stays in reach as rules are added.
