@@ -15,4 +15,14 @@ class Count extends Summarizer
     {
         return $query->whereNotNull($column)->count();
     }
+
+    public function getAggregates(): array
+    {
+        return ['count'];
+    }
+
+    public function fromAggregates(array $values): mixed
+    {
+        return (int) ($values[0] ?? 0);
+    }
 }

@@ -275,9 +275,12 @@ abstract class Column
     {
         $model = $query->getModel();
         $attribute = $query->qualifyColumn($this->name);
+        $results = $this->runAggregates($query, $attribute);
 
-        return array_map(function (Summarizer $summarizer) use ($attribute, $model, $query): array {
-            $value = $summarizer->summarize((clone $query)->reorder(), $attribute);
+        return array_map(function (Summarizer $summarizer, int $index) use ($attribute, $model, $query, $results): array {
+            $value = array_key_exists($index, $results)
+                ? $summarizer->fromAggregates($results[$index])
+                : $summarizer->summarize((clone $query)->reorder(), $attribute);
 
             return [
                 'label' => $summarizer->getLabel(),
@@ -285,7 +288,42 @@ abstract class Column
                     ? implode(' – ', array_map(fn (mixed $part): string => (string) $this->formatValue($part, $model), $value))
                     : $this->formatValue($value, $model),
             ];
-        }, $this->summarizers);
+        }, $this->summarizers, array_keys($this->summarizers));
+    }
+
+    /**
+     * Every built-in summary of this column in one query, rather than one each.
+     *
+     * @param  Builder<covariant Model>  $query
+     * @return array<int, array<int, mixed>> Summarizer index => its aggregates' results.
+     */
+    private function runAggregates(Builder $query, string $attribute): array
+    {
+        $base = (clone $query)->reorder()->toBase();
+        // Selected columns next to aggregates would fail on databases that check grouping.
+        $base->columns = null;
+        $column = $base->getGrammar()->wrap($attribute);
+        $selects = [];
+
+        foreach ($this->summarizers as $index => $summarizer) {
+            foreach ($summarizer->getAggregates() as $position => $function) {
+                $selects["xq_{$index}_{$position}"] = "{$function}({$column})";
+            }
+        }
+
+        if ($selects === []) {
+            return [];
+        }
+
+        $row = (array) $base->selectRaw(implode(', ', array_map(fn (string $sql, string $alias): string => "{$sql} as {$alias}", $selects, array_keys($selects))))->first();
+        $results = [];
+
+        foreach (array_keys($selects) as $alias) {
+            [, $index] = explode('_', $alias);
+            $results[(int) $index][] = $row[$alias] ?? null;
+        }
+
+        return $results;
     }
 
     public function isSortable(): bool

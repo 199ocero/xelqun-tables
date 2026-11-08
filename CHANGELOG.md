@@ -29,6 +29,7 @@ Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, 
 - Polling waits while someone types in a cell or has a dialog open, instead of wiping what they typed.
 - A refused action says 'You are not allowed to do that.', and Retry only shows for a table that failed to load.
 - Big tables are faster: a change to one cell or one selection renders only that row, and the row highlight measures at most once a frame. A filter's options load once per request instead of twice.
+- A column's built-in summaries run as one query, rather than one for each line.
 - The first row can't move up and the last can't move down, and each row's move buttons and checkbox say which row they belong to.
 
 ## 0.5.1 - 2026-11-07

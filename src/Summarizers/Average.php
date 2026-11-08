@@ -13,4 +13,9 @@ class Average extends Summarizer
     {
         return $query->avg($column);
     }
+
+    public function getAggregates(): array
+    {
+        return ['avg'];
+    }
 }

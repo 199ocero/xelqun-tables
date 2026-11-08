@@ -13,4 +13,14 @@ class Sum extends Summarizer
     {
         return $query->sum($column);
     }
+
+    public function getAggregates(): array
+    {
+        return ['sum'];
+    }
+
+    public function fromAggregates(array $values): mixed
+    {
+        return $values[0] ?? 0;
+    }
 }

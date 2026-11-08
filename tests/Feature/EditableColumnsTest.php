@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Testing\TestResponse;
 use Xelqun\Tables\Columns\CheckboxColumn;
@@ -17,6 +18,7 @@ use Xelqun\Tables\Summarizers\Average;
 use Xelqun\Tables\Summarizers\Count;
 use Xelqun\Tables\Summarizers\Range;
 use Xelqun\Tables\Summarizers\Sum;
+use Xelqun\Tables\Summarizers\Summarizer;
 use Xelqun\Tables\Table;
 use Xelqun\Tables\Tests\Fixtures\Category;
 use Xelqun\Tables\Tests\Fixtures\Product;
@@ -192,6 +194,29 @@ describe('summaries', function () {
             ['label' => null, 'value' => 2],
             ['label' => null, 'value' => '10 – 30'],
         ]);
+    });
+
+    it('works out a column\'s summaries in one query, and still runs a summarizer of its own', function () {
+        EditableTable::$columns = [TextColumn::make('price')->summarize([Sum::make(), Average::make(), Count::make(), Range::make(), new class extends Summarizer
+        {
+            public function summarize(Builder $query, string $column): mixed
+            {
+                return $query->max($column) * 2;
+            }
+        }])];
+        $aggregateQueries = 0;
+        DB::listen(function ($query) use (&$aggregateQueries): void {
+            $aggregateQueries += (int) preg_match('/\b(sum|avg|count|min|max)\(/i', $query->sql);
+        });
+        $table = EditableTable::make();
+        $state = TableState::from([], $table);
+        $aggregateQueries = 0;
+
+        $lines = $table->toResult($state)['summaries']['price'];
+
+        expect($lines[4]['value'])->toEqual(60)
+            // The count for pagination, the shared one and the custom one.
+            ->and($aggregateQueries)->toBe(3);
     });
 
     it('formats like the column', function () {
