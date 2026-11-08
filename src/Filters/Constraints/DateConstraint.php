@@ -11,6 +11,11 @@ class DateConstraint extends Constraint
 {
     private const array COMPARISONS = ['on' => '=', 'before' => '<', 'after' => '>'];
 
+    public function getValueField(): ?string
+    {
+        return 'date';
+    }
+
     public function getOperators(): array
     {
         $operators = [];

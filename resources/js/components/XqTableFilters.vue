@@ -46,7 +46,12 @@ function reset(): void {
 </script>
 
 <template>
-    <XqPopover v-model:open="open" align="end" class="w-80">
+    <!-- Capped to the room on screen and scrolled inside, so Apply stays in reach as rules are added. -->
+    <XqPopover
+        v-model:open="open"
+        align="end"
+        class="max-h-(--reka-popover-content-available-height) w-[min(28rem,calc(100vw-2rem))] overflow-y-auto"
+    >
         <template #trigger>
             <XqButton type="button" variant="outline" data-xq-table-filters>
                 <ListFilter />

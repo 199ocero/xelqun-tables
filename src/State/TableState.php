@@ -96,6 +96,8 @@ final class TableState
     {
         return match (true) {
             is_array($value) => array_map(self::matchOptionKey(...), $value),
+            // JSON and the testing helpers send true and false, which PHP keys as 1 and 0.
+            is_bool($value) => (int) $value,
             is_string($value) && (string) (int) $value === $value => (int) $value,
             default => $value,
         };

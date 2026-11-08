@@ -207,7 +207,8 @@ abstract class Table
     {
         return $this->filterDefaults ??= $this->getFilters() === []
             ? []
-            : TableFiltersForm::for($this)->getData();
+            // The same form, so its options load once. This runs before a request's values reach it.
+            : $this->getFiltersForm()->getData();
     }
 
     /**
@@ -225,6 +226,10 @@ abstract class Table
             $keys,
             fn (mixed $key): bool => is_scalar($key) && ($model->getKeyType() !== 'int' || ctype_digit((string) $key)),
         )));
+
+        if ($keys === []) {
+            return $model->newCollection();
+        }
 
         return $query
             ->withGlobalScope('xelqun-records', fn (Builder $scoped): Builder => $scoped->whereKey($keys))
@@ -340,11 +345,15 @@ abstract class Table
     }
 
     /**
-     * Check for changes this often, as in '10s'.
+     * Check for changes this often, in seconds or minutes, as in '10s' or '1m'.
      */
     public function poll(string $interval): static
     {
-        $this->pollSeconds = (int) $interval;
+        if (! preg_match('/^(\d+)\s*(s|m)$/', $interval, $match) || (int) $match[1] === 0) {
+            throw new TableDefinitionException("Poll every [{$interval}] isn't an interval. Use seconds or minutes, as in '10s' or '1m'.");
+        }
+
+        $this->pollSeconds = (int) $match[1] * ($match[2] === 'm' ? 60 : 1);
 
         return $this;
     }
@@ -558,6 +567,28 @@ abstract class Table
         return $summaries;
     }
 
+    /**
+     * A related value sorts the way its column does, so `category.name` groups like it sorts.
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    private function applyGroupOrder(Builder $query): void
+    {
+        if (! str_contains((string) $this->groupColumn, '.')) {
+            $query->orderBy($query->qualifyColumn((string) $this->groupColumn));
+
+            return;
+        }
+
+        $column = array_find($this->getColumns(), fn (Column $column): bool => $column->getName() === $this->groupColumn);
+
+        if ($column === null) {
+            throw new TableDefinitionException("Group by [{$this->groupColumn}] needs a column with that name.");
+        }
+
+        $column->applySort($query, 'asc');
+    }
+
     private function getRowGroup(Model $record): ?string
     {
         if ($this->groupColumn === null) {
@@ -632,11 +663,12 @@ abstract class Table
             }
         }
 
-        if ($this->groupColumn !== null && ! str_contains($this->groupColumn, '.')) {
+        if ($this->groupColumn !== null) {
             // Ahead of any sort, so a group's rows stay together.
             $orders = $query->getQuery()->orders ?? [];
-            $query->reorder()->orderBy($query->qualifyColumn($this->groupColumn));
-            $query->getQuery()->orders = [...$query->getQuery()->orders, ...$orders];
+            $query->reorder();
+            $this->applyGroupOrder($query);
+            $query->getQuery()->orders = [...$query->getQuery()->orders ?? [], ...$orders];
         }
 
         // Rows with equal values have no order of their own, so they could repeat across pages.

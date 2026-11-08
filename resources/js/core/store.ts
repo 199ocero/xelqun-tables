@@ -26,6 +26,8 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
     const schema = shallowRef(initial);
     const loading = ref(false);
     const error = ref<string | null>(null);
+    /** Only a failed load can be tried again as it was. */
+    const canRetry = ref(false);
     const selected = ref(new Set<string>());
 
     let sequence = 0;
@@ -37,11 +39,20 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
     }
 
     function failureMessage(failure: unknown, fallback: string): string {
+        if (failure instanceof HttpError && failure.status === 419) {
+            return t('This table has expired. Reload the page to continue.');
+        }
+
         return t(
-            failure instanceof HttpError && failure.status === 419
-                ? 'This table has expired. Reload the page to continue.'
+            failure instanceof HttpError && failure.status === 403
+                ? "You aren't allowed to do that."
                 : fallback,
         );
+    }
+
+    function fail(message: string | null, retry = false): void {
+        error.value = message;
+        canRetry.value = retry;
     }
 
     /**
@@ -56,7 +67,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
 
         lastQuery = query;
         loading.value = true;
-        error.value = null;
+        fail(null);
 
         try {
             const result = await postJson<TableResult>(
@@ -77,7 +88,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                 return;
             }
 
-            error.value = failureMessage(failure, 'Could not load the records.');
+            fail(failureMessage(failure, 'Could not load the records.'), true);
         }
 
         loading.value = false;
@@ -97,21 +108,20 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
     }
 
     /**
-     * Save one editable cell. The answer replaces the cell, and on a failure the
-     * cell gets a new object, so it drops what was typed for what's saved.
+     * Save one editable cell. The answer replaces the cell. A rule it breaks
+     * stays on the cell with what was typed, and any other failure gives the
+     * cell a new object, so it drops what was typed for what's saved. Only the
+     * changed row is a new object, so the other rows don't render again.
      */
     async function updateCell(key: string, column: string, value: unknown): Promise<void> {
-        error.value = null;
+        fail(null);
 
-        const replaceCell = (cell?: TableCell): void => {
+        const replaceCell = (next: (cell: TableCell) => TableCell): void => {
             schema.value = {
                 ...schema.value,
                 rows: schema.value.rows.map((row) =>
                     row.key === key
-                        ? {
-                              ...row,
-                              cells: { ...row.cells, [column]: cell ?? { ...row.cells[column] } },
-                          }
+                        ? { ...row, cells: { ...row.cells, [column]: next(row.cells[column]) } }
                         : row,
                 ),
             };
@@ -125,13 +135,19 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                 value,
             });
 
-            replaceCell(cell);
+            replaceCell(() => cell);
         } catch (failure) {
             const message =
                 failure instanceof HttpError ? failure.validationErrors.value?.[0] : undefined;
 
-            error.value = message ?? failureMessage(failure, 'Could not save the change.');
-            replaceCell();
+            if (message) {
+                replaceCell((current) => ({ ...current, error: message }));
+
+                return;
+            }
+
+            fail(failureMessage(failure, 'Could not save the change.'));
+            replaceCell((current) => ({ ...current }));
         }
     }
 
@@ -141,7 +157,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
 
     /** Move a row, then show the order the server now has. */
     async function moveRow(key: string, direction: 'up' | 'down'): Promise<void> {
-        error.value = null;
+        fail(null);
 
         try {
             await postJson(schema.value.endpoints.reorder, {
@@ -151,7 +167,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
             });
             await reload();
         } catch (failure) {
-            error.value = failureMessage(failure, 'Could not save the change.');
+            fail(failureMessage(failure, 'Could not save the change.'));
         }
     }
 
@@ -197,7 +213,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                 selected.value = new Set(keys);
             }
         } catch (failure) {
-            error.value = failureMessage(failure, 'Could not load the records.');
+            fail(failureMessage(failure, 'Could not load the records.'));
         }
     }
 
@@ -229,7 +245,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
             const [message] =
                 failure instanceof HttpError ? Object.values(failure.validationErrors).flat() : [];
 
-            error.value = message ?? failureMessage(failure, 'That action could not run.');
+            fail(message ?? failureMessage(failure, 'That action could not run.'));
         };
 
         return {
@@ -252,7 +268,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
                     return null;
                 }
 
-                error.value = null;
+                fail(null);
 
                 try {
                     const response = await send<ActionResult>(node, 'run', modal?.state.data);
@@ -293,7 +309,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         dispose();
         schema.value = next;
         lastQuery = next.query;
-        error.value = null;
+        fail(null);
         clearSelection();
     }
 
@@ -301,6 +317,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
         schema,
         loading,
         error,
+        canRetry,
         selected,
         t,
         load,

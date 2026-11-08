@@ -5,6 +5,7 @@ namespace Xelqun\Tables\Filters;
 use Closure;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Xelqun\Forms\Components\Select;
 use Xelqun\Tables\Table;
 
@@ -73,14 +74,35 @@ class SelectFilter extends BaseFilter
 
     public function getFormComponents(): array
     {
-        return [
-            Select::make($this->name)
-                ->label($this->getLabel())
-                ->options(fn (): array => $this->getOptions())
-                ->multiple($this->isMultiple)
-                ->searchable($this->isSearchable)
-                ->default($this->default),
-        ];
+        $select = Select::make($this->name)
+            ->label($this->getLabel())
+            ->multiple($this->isMultiple)
+            ->searchable($this->isSearchable)
+            ->default($this->default);
+
+        if ($this->relationship === null || ! $this->isSearchable) {
+            return [$select->options(fn (): array => $this->getOptions())];
+        }
+
+        // Searched on the server, so a long list of related records never reaches the page.
+        return [$select
+            ->getSearchResultsUsing(fn (string $search): array => $this->getRelatedQuery()
+                ->whereLike($this->titleAttribute, '%'.$search.'%')
+                ->limit(50)
+                ->pluck($this->titleAttribute, $this->getRelatedQuery()->getModel()->getKeyName())
+                ->all())
+            ->getOptionLabelUsing(fn (mixed $value): mixed => $this->getRelatedQuery()->whereKey($value)->value($this->titleAttribute))];
+    }
+
+    /**
+     * @return Builder<Model>
+     */
+    private function getRelatedQuery(): Builder
+    {
+        /** @var Table $table */
+        $table = $this->table;
+
+        return $table->query()->getModel()->{$this->relationship}()->getRelated()->newQuery()->orderBy($this->titleAttribute);
     }
 
     /**
@@ -94,12 +116,10 @@ class SelectFilter extends BaseFilter
             return $options instanceof Arrayable ? $options->toArray() : $options;
         }
 
-        /** @var Table $table */
-        $table = $this->table;
-        $related = $table->query()->getModel()->{$this->relationship}()->getRelated();
+        $query = $this->getRelatedQuery();
 
-        // shortcut: every related record is sent, so a very long list needs a Filter with an async Select instead.
-        return $related->newQuery()->orderBy($this->titleAttribute)->pluck($this->titleAttribute, $related->getKeyName())->all();
+        // Every related record is sent, so a long list should be searchable(), which searches on the server instead.
+        return $query->pluck($this->titleAttribute, $query->getModel()->getKeyName())->all();
     }
 
     public function apply(Builder $query, array $data): void

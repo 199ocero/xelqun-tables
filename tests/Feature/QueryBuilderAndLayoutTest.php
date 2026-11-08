@@ -5,6 +5,7 @@ use Illuminate\Testing\TestResponse;
 use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Columns\SelectColumn;
 use Xelqun\Tables\Columns\TextColumn;
+use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Filters\Constraints\BooleanConstraint;
 use Xelqun\Tables\Filters\Constraints\DateConstraint;
 use Xelqun\Tables\Filters\Constraints\NumberConstraint;
@@ -94,9 +95,9 @@ function matching(array $rules, bool $matchAny = false): array
     return collect($table->toResult(TableState::from($query, $table))['rows'])->pluck('cells.name.state')->all();
 }
 
-function rule(string $constraint, string $operator, mixed $value = null): array
+function rule(string $constraint, string $operator, mixed $value = null, string $field = 'value'): array
 {
-    return ['constraint' => $constraint, 'operator' => $operator, 'value' => $value];
+    return ['constraint' => $constraint, 'operator' => $operator, $field => $value];
 }
 
 function move(int $record, string $direction): TestResponse
@@ -126,12 +127,13 @@ describe('the query builder', function () {
         'more than' => [rule('price', 'greater', '15'), ['Desk', 'Sofa']],
         'at most' => [rule('price', 'less_or_equal', '20'), ['Lamp', 'Desk']],
         'on' => [rule('is_featured', 'is_true'), ['Lamp']],
-        'select' => [rule('status', 'equals', 'draft'), ['Lamp']],
+        'select' => [rule('status', 'equals', 'draft', 'option'), ['Lamp']],
         'a relation' => [rule('category.name', 'contains', 'Aud'), ['Desk']],
+        'a date' => [rule('created_at', 'after', '2000-01-01', 'date'), ['Lamp', 'Desk', 'Sofa']],
     ]);
 
     it('needs every rule, or any of them', function () {
-        $rules = [rule('name', 'contains', 'Lamp'), rule('status', 'equals', 'live')];
+        $rules = [rule('name', 'contains', 'Lamp'), rule('status', 'equals', 'live', 'option')];
 
         expect(matching($rules))->toBe([])
             ->and(matching($rules, matchAny: true))->toEqualCanonicalizing(['Lamp', 'Desk', 'Sofa']);
@@ -150,9 +152,30 @@ describe('the query builder', function () {
     })->with([
         'operator' => [rule('name', 'greater', 'x')],
         'a word for a number' => [rule('price', 'greater', 'lots')],
-        'a word for a date' => [rule('created_at', 'after', 'lots')],
-        'a choice that isn\'t one' => [rule('status', 'equals', 'hidden')],
+        'a word for a date' => [rule('created_at', 'after', 'lots', 'date')],
+        'a choice that isn\'t one' => [rule('status', 'equals', 'hidden', 'option')],
+        'a label in place of the choice' => [rule('status', 'equals', 'Draft', 'option')],
     ]);
+
+    it('counts only the rules that filter something', function () {
+        $table = BuilderTable::make();
+        $state = fn (array $rules) => TableState::from(['filters' => ['rules' => $rules]], $table);
+
+        expect($table->toResult($state([rule('status', 'equals', 'Draft', 'option')]))['activeFilters'])->toBe(0)
+            ->and($table->toResult($state([rule('status', 'equals', 'draft', 'option')]))['activeFilters'])->toBe(1);
+    });
+
+    it('asks for each kind of value with its own field', function () {
+        $rules = collect(BuilderTable::make()->toSchema()['filters']['components'])->firstWhere('path', 'data.rules');
+        $fields = collect(json_decode(json_encode($rules), true)['props']['template'])
+            ->mapWithKeys(fn (array $field): array => [str_replace('data.rules.{row}.', '', $field['path']) => [$field['type'], $field['rules']['visible']['value'] ?? null]]);
+
+        expect($fields->only(['value', 'option', 'date'])->all())->toBe([
+            'value' => ['text-input', ['name', 'price', 'category.name']],
+            'option' => ['select', ['status']],
+            'date' => ['date-picker', ['created_at']],
+        ]);
+    });
 });
 
 describe('moving rows', function () {
@@ -227,4 +250,14 @@ describe('column toggles', function () {
         expect($columns[0])->toMatchArray(['toggleable' => true, 'hiddenByDefault' => true])
             ->and($columns[1])->not->toHaveKey('toggleable');
     });
+});
+
+describe('polling', function () {
+    it('reads seconds and minutes', function (string $interval, int $seconds) {
+        expect(BuilderTable::make()->poll($interval)->toSchema()['layout']['pollSeconds'])->toBe($seconds);
+    })->with([['10s', 10], ['1m', 60]]);
+
+    it('refuses an interval it can\'t read', function (string $interval) {
+        BuilderTable::make()->poll($interval);
+    })->with(['500ms', '10', '0s'])->throws(TableDefinitionException::class);
 });

@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class BooleanConstraint extends Constraint
 {
+    public function getValueField(): ?string
+    {
+        return null;
+    }
+
     public function getOperators(): array
     {
         return ['is_true' => __('xelqun-tables::messages.operators.is_true'), 'is_false' => __('xelqun-tables::messages.operators.is_false')];

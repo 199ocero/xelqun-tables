@@ -85,6 +85,19 @@ class CustomQueriesTable extends CatalogTable
     }
 }
 
+class WhereFirstSearchTable extends CatalogTable
+{
+    public function columns(): array
+    {
+        return [
+            TextColumn::make('secret')->searchable(),
+            TextColumn::make('name')->searchable(query: fn (Builder $query, string $search) => $query
+                ->whereLike('name', "%{$search}%")
+                ->orWhereLike('status', "%{$search}%")),
+        ];
+    }
+}
+
 class MethodNameTable extends CatalogTable
 {
     public function columns(): array
@@ -162,6 +175,14 @@ it('keeps a search inside a query that uses orWhere', function () {
 
     expect(namesFrom(EitherNameTable::make(), ['search' => 'beta']))->toBe(['Beta'])
         ->and(namesFrom(EitherNameTable::make(), ['search' => 'outside']))->toBe([]);
+});
+
+it('keeps a search closure that starts with where from narrowing the other columns', function () {
+    product('Lamp', ['secret' => 'ZZ-1']);
+    product('Chair');
+
+    expect(namesFrom(WhereFirstSearchTable::make(), ['search' => 'ZZ-1']))->toBe(['Lamp'])
+        ->and(namesFrom(WhereFirstSearchTable::make(), ['search' => 'chair']))->toBe(['Chair']);
 });
 
 it('counts only what the search found', function () {

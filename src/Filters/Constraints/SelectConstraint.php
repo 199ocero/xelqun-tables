@@ -22,6 +22,16 @@ class SelectConstraint extends Constraint
         return $this;
     }
 
+    public function getValueField(): ?string
+    {
+        return $this->options === [] ? 'value' : 'option';
+    }
+
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
+
     public function getOperators(): array
     {
         return ['equals' => __('xelqun-tables::messages.operators.equals'), 'not_equals' => __('xelqun-tables::messages.operators.not_equals')];

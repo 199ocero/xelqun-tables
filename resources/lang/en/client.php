@@ -6,6 +6,8 @@
  */
 
 return [
+    ':column, ascending' => ':column, ascending',
+    ':column, descending' => ':column, descending',
     'Actions' => 'Actions',
     'Apply' => 'Apply',
     'Are you sure?' => 'Are you sure?',
@@ -31,9 +33,11 @@ return [
     'Select all :count' => 'Select all :count',
     'Select all on this page' => 'Select all on this page',
     'Select row' => 'Select row',
+    'Sort by' => 'Sort by',
     'Showing :from to :until of :total' => 'Showing :from to :until of :total',
     'That action could not run.' => 'That action could not run.',
     'This table has expired. Reload the page to continue.' => 'This table has expired. Reload the page to continue.',
     'This table needs a newer version of @xelqun/tables.' => 'This table needs a newer version of @xelqun/tables.',
     'Unknown column type: :type' => 'Unknown column type: :type',
+    "You aren't allowed to do that." => "You aren't allowed to do that.",
 ];

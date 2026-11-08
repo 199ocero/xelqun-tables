@@ -30,7 +30,8 @@ class TernaryFilter extends BaseFilter
             Select::make($this->name)
                 ->label($this->getLabel())
                 ->options(['1' => __('xelqun-tables::messages.yes'), '0' => __('xelqun-tables::messages.no')])
-                ->default($this->default),
+                // The options are keyed '1' and '0', so a default of true or false has to match them.
+                ->default(is_bool($this->default) ? (string) (int) $this->default : $this->default),
         ];
     }
 
@@ -44,6 +45,6 @@ class TernaryFilter extends BaseFilter
      */
     public function isActive(array $data): bool
     {
-        return in_array((string) ($data[$this->name] ?? ''), ['0', '1'], true);
+        return in_array($data[$this->name] ?? null, [true, false, 0, 1, '0', '1'], true);
     }
 }

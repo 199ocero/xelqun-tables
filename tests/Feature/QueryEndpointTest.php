@@ -187,3 +187,12 @@ it('checks authorize on every request', function () {
 
     queryWithToken($token)->assertForbidden();
 });
+
+it('counts each endpoint against its own limit', function () {
+    // The action route allows 60 a minute, so a shared counter would refuse it here.
+    foreach (range(1, 61) as $ignored) {
+        $this->queryTable(ProductsTable::make())->assertOk();
+    }
+
+    expect($this->mountTableAction(ProductsTable::make(), 'missing', Product::first()->id)->status())->not->toBe(429);
+});

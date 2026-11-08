@@ -2,6 +2,33 @@
 
 Xelqun Tables is pre-alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Changed
+
+- **`xelqun-tables:install` sets up forms too.** It installs both npm packages and runs `xelqun-forms:install`, so the plugin, the forms stylesheet (which holds the theme tokens) and the Vite setting are in place. Before, badges and the filters panel rendered unstyled after a tables-only install.
+- **Query builder rules keep each kind of value in its own field.** Text and numbers stay in `value`, a `SelectConstraint` with options uses a select called `option`, and a `DateConstraint` uses a date picker called `date`. A `BooleanConstraint` asks for no value. A saved URL that holds a select or date rule in `value` no longer applies it.
+- **`poll()` takes seconds or minutes**, as in `'10s'` or `'1m'`, and throws on anything else. `'1m'` used to poll every second.
+- A validation message from an editable cell shows under that cell, keeps what was typed, and names the column ("The Stock field...") rather than "value".
+
+### Added
+
+- **`SelectFilter::relationship()->searchable()`** searches the related records on the server, so a long list never reaches the page.
+- In card layout, a **Sort by** menu replaces the column headers.
+
+### Fixed
+
+- Each table endpoint has its own rate limit. They shared one counter per user, so 60 searches or polls in a minute blocked every action and edit.
+- A `searchable(query:)` closure that starts with `where()` no longer narrows the search on every other column.
+- `defaultGroup()` on a related column, such as `category.name`, keeps each group's rows together. A related group with no matching column throws a `TableDefinitionException`.
+- `TernaryFilter` reads `true` and `false`, and `default(false)` works.
+- A query builder rule only counts as an active filter when it filters something.
+- The filters panel fits the screen and scrolls, so Apply stays in reach as rules are added.
+- Polling waits while someone types in a cell or has a dialog open, instead of wiping what they typed.
+- A refused action says "You aren't allowed to do that.", and Retry only shows for a table that failed to load.
+- Big tables are faster: a change to one cell or one selection renders only that row, and the row highlight measures at most once a frame. A filter's options load once per request instead of twice.
+- The first row can't move up and the last can't move down, and each row's move buttons and checkbox say which row they belong to.
+
 ## 0.5.1 - 2026-11-07
 
 ### Added

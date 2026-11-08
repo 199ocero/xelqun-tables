@@ -46,6 +46,33 @@ abstract class Constraint
     abstract public function getOperators(): array;
 
     /**
+     * The rule's field that holds the value: `value` for text, `option` for a
+     * select, `date` for a date picker, or null when the operator says it all.
+     */
+    public function getValueField(): ?string
+    {
+        return 'value';
+    }
+
+    /**
+     * The choices of an `option` field.
+     *
+     * @return array<array-key, string>
+     */
+    public function getOptions(): array
+    {
+        return [];
+    }
+
+    /**
+     * @internal
+     */
+    public function isUsable(string $operator, mixed $value): bool
+    {
+        return isset($this->getOperators()[$operator]) && $this->accepts($value);
+    }
+
+    /**
      * Whether this operator can use this value. A rule that can't is skipped, as a
      * bad value in a filter is.
      */
@@ -64,7 +91,7 @@ abstract class Constraint
      */
     public function apply(Builder $query, string $operator, mixed $value): void
     {
-        if (! isset($this->getOperators()[$operator]) || ! $this->accepts($value)) {
+        if (! $this->isUsable($operator, $value)) {
             return;
         }
 

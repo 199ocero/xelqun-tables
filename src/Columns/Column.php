@@ -406,7 +406,8 @@ abstract class Column
     public function applySearch(Builder $query, string $search): void
     {
         if ($this->searchUsing !== null) {
-            $this->evaluate($this->searchUsing, ['query' => $query, 'search' => $search]);
+            // Its own group, so a closure that starts with where() can't AND into the other columns.
+            $query->orWhere(fn (Builder $group) => $this->evaluate($this->searchUsing, ['query' => $group, 'search' => $search]));
 
             return;
         }

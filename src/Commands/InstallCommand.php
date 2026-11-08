@@ -4,6 +4,7 @@ namespace Xelqun\Tables\Commands;
 
 use Illuminate\Console\Command;
 use Xelqun\Forms\Commands\Concerns\EditsHostApp;
+use Xelqun\Forms\Schema\SchemaVersion as FormsVersion;
 use Xelqun\Tables\Schema\SchemaVersion;
 
 class InstallCommand extends Command
@@ -22,9 +23,15 @@ class InstallCommand extends Command
 
     public function handle(): int
     {
-        if (! $this->option('without-node') && ! $this->installNodePackage(self::NPM_PACKAGE.'@'.SchemaVersion::PACKAGE)) {
+        // Both, so forms lands in package.json rather than as an unlisted peer.
+        $packages = self::NPM_PACKAGE.'@'.SchemaVersion::PACKAGE.' @xelqun/forms@'.FormsVersion::PACKAGE;
+
+        if (! $this->option('without-node') && ! $this->installNodePackage($packages)) {
             return self::FAILURE;
         }
+
+        // Tables renders forms' components and needs its plugin, theme tokens and Vite setting.
+        $this->call('xelqun-forms:install', ['--without-node' => true]);
 
         $manualStep = $this->importStylesheet(self::STYLESHEET);
 

@@ -15,6 +15,8 @@ export interface TableColumn {
 
 export interface TableCell {
     state: any;
+    /** Why the last value typed into an editable cell was refused. */
+    error?: string;
     [key: string]: any;
 }
 

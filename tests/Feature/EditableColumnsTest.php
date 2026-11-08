@@ -18,6 +18,7 @@ use Xelqun\Tables\Summarizers\Count;
 use Xelqun\Tables\Summarizers\Range;
 use Xelqun\Tables\Summarizers\Sum;
 use Xelqun\Tables\Table;
+use Xelqun\Tables\Tests\Fixtures\Category;
 use Xelqun\Tables\Tests\Fixtures\Product;
 
 class EditableTable extends Table
@@ -124,7 +125,8 @@ describe('editing a cell', function () {
             ToggleColumn::make('is_featured')->authorize(true),
         ];
 
-        saveCell('name', 'Far too long', $this->product->id)->assertUnprocessable();
+        saveCell('name', 'Far too long', $this->product->id)->assertUnprocessable()
+            ->assertJsonPath('errors.value.0', 'The Name field must not be greater than 5 characters.');
         saveCell('name', ['an', 'array'], $this->product->id)->assertUnprocessable();
         saveCell('is_featured', 'maybe', $this->product->id)->assertUnprocessable();
 
@@ -224,6 +226,25 @@ describe('grouping', function () {
         expect(collect($rows)->pluck('group')->all())->toBe(['draft', 'draft', 'live'])
             ->and(collect($rows)->pluck('cells.name.state')->all())->toBe(['Lamp', 'Zz', 'Aa']);
     });
+
+    it('keeps a related value\'s rows together', function () {
+        $lamps = Category::create(['name' => 'Lamps']);
+        $chairs = Category::create(['name' => 'Chairs']);
+        $this->product->update(['category_id' => $lamps->id]);
+        Product::create(['name' => 'Stool', 'status' => 'draft', 'category_id' => $chairs->id]);
+        Product::create(['name' => 'Bulb', 'status' => 'draft', 'category_id' => $lamps->id]);
+        EditableTable::$columns = [TextColumn::make('name'), TextColumn::make('category.name')];
+        EditableTable::$group = 'category.name';
+
+        expect(collect(EditableTable::make()->toSchema()['rows'])->pluck('group')->all())->toBe(['Chairs', 'Lamps', 'Lamps']);
+    });
+
+    it('needs a column to group by a related value', function () {
+        EditableTable::$columns = [TextColumn::make('name')];
+        EditableTable::$group = 'category.name';
+
+        EditableTable::make()->toSchema();
+    })->throws(TableDefinitionException::class);
 
     it('labels rows only when grouped', function () {
         EditableTable::$columns = [TextColumn::make('name')];

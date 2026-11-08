@@ -72,7 +72,8 @@ trait IsEditable
 
     public function updateState(Model $record, mixed $value): void
     {
-        Validator::make(['value' => $value], ['value' => [...$this->getValueRules(), ...$this->editRules]])->validate();
+        // Named after the column, so a message reads "The stock field...", not "The value field...".
+        Validator::make(['value' => $value], ['value' => [...$this->getValueRules(), ...$this->editRules]], attributes: ['value' => $this->getLabel()])->validate();
 
         if ($this->updateStateUsing !== null) {
             $this->evaluate($this->updateStateUsing, ['state' => $value, 'record' => $record]);

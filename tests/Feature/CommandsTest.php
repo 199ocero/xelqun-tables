@@ -72,14 +72,25 @@ it('refuses a table name it can\'t use, and keeps what is there', function (): v
     $this->artisan('make:xelqun-table', ['name' => 'Products'])->assertFailed();
 });
 
-it('imports the stylesheet right after tailwindcss', function (): void {
+it('imports both stylesheets right after tailwindcss', function (): void {
     File::ensureDirectoryExists("{$this->appPath}/resources/css");
     File::put("{$this->appPath}/resources/css/app.css", "@import 'tailwindcss';\n");
 
     $this->artisan('xelqun-tables:install', ['--without-node' => true])->assertSuccessful();
     $this->artisan('xelqun-tables:install', ['--without-node' => true])->assertSuccessful();
 
-    expect(File::get("{$this->appPath}/resources/css/app.css"))->toBe("@import 'tailwindcss';\n@import '@xelqun/tables/style.css';\n");
+    expect(File::get("{$this->appPath}/resources/css/app.css"))->toBe("@import 'tailwindcss';\n@import '@xelqun/tables/style.css';\n@import '@xelqun/forms/style.css';\n");
+});
+
+it('sets up forms, which tables renders with', function (): void {
+    File::ensureDirectoryExists("{$this->appPath}/resources/js");
+    File::put("{$this->appPath}/resources/js/app.ts", "import { createInertiaApp } from '@inertiajs/vue3';\n\nvoid createInertiaApp({\n    withApp: (app) => {\n        app.directive('focus', {});\n    },\n});\n");
+    File::put("{$this->appPath}/vite.config.ts", "export default defineConfig({\n    plugins: [],\n});\n");
+
+    $this->artisan('xelqun-tables:install', ['--without-node' => true])->assertSuccessful();
+
+    expect(File::get("{$this->appPath}/resources/js/app.ts"))->toContain('app.use(createXelqunForms());')
+        ->and(File::get("{$this->appPath}/vite.config.ts"))->toContain("exclude: ['@xelqun/forms', '@xelqun/tables', '@xelqun/panels']");
 });
 
 it('prints the step when it can\'t find the stylesheet', function (): void {

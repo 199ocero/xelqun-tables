@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createApp, defineComponent, h } from 'vue';
+import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createXelqunForms, defaultComponents } from '@xelqun/forms';
 import { fieldNode, formSchema } from '@xelqun/forms/testing';
 import { builtInCells } from '../../resources/js/components/cells';
@@ -984,6 +984,9 @@ describe('the gliding row highlight', () => {
             global: { plugins: [createXelqunForms()] },
         });
     const glide = (wrapper: ReturnType<typeof render>) => wrapper.find('[data-xq-table-glide]');
+    // The glide measures on the next frame.
+    const frame = () =>
+        new Promise((resolve) => requestAnimationFrame(resolve)).then(() => nextTick());
 
     it('stays hidden until a row is hovered', () => {
         expect(glide(render()).attributes('style')).toContain('opacity: 0');
@@ -994,10 +997,12 @@ describe('the gliding row highlight', () => {
         const tableRows = wrapper.findAll('[data-xq-table-row]');
 
         await tableRows[0].trigger('mouseover');
+        await frame();
         expect(glide(wrapper).attributes('style')).toContain('opacity: 1');
         expect(glide(wrapper).classes().join(' ')).not.toContain('[transform');
 
         await tableRows[1].trigger('mouseover');
+        await frame();
         expect(glide(wrapper).classes().join(' ')).toContain('[transform');
     });
 
@@ -1017,6 +1022,7 @@ describe('the gliding row highlight', () => {
         const wrapper = render();
 
         await wrapper.find('[data-xq-table-row]').trigger('focusin');
+        await frame();
 
         expect(glide(wrapper).attributes('style')).toContain('opacity: 1');
     });
@@ -1155,5 +1161,132 @@ describe('editable cells and grouped rows', () => {
             'Blue',
         ]);
         expect(wrapper.find('[data-xq-table-summary]').text()).toMatch(/Count:\s+3/);
+    });
+});
+
+describe('editing and polling', () => {
+    const layout = { grid: null, striped: false, pollSeconds: 5, reorderable: false };
+    const columns = [
+        {
+            name: 'stock',
+            type: 'text-input-column',
+            label: 'Stock',
+            sortable: false,
+            props: { editable: true },
+        },
+    ];
+    const rows = [{ key: '1', cells: { stock: { state: '42', canEdit: true } }, actions: [] }];
+
+    afterEach(() => vi.useRealTimers());
+
+    it('shows a refused value on its cell and keeps what was typed', async () => {
+        vi.stubGlobal(
+            'fetch',
+            respondWith({ errors: { value: ['Stock must be at least 0.'] } }, 422),
+        );
+
+        const wrapper = mount(XqTable, {
+            props: { table: schema({ columns, rows }) },
+            global: { plugins: [createXelqunForms()] },
+        });
+        const input = wrapper.find('input');
+
+        await input.setValue('-5');
+        await input.trigger('blur');
+        await flushPromises();
+
+        expect(wrapper.find('[data-xq-cell-error]').text()).toBe('Stock must be at least 0.');
+        expect(wrapper.find('input').element.value).toBe('-5');
+        expect(wrapper.find('input').attributes('aria-invalid')).toBe('true');
+        expect(wrapper.find('[role="alert"] button').exists()).toBe(false);
+    });
+
+    it('shows a refused value on its card too', async () => {
+        vi.stubGlobal('fetch', respondWith({ errors: { value: ['Too low.'] } }, 422));
+
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({ columns, rows, layout: { ...layout, pollSeconds: null, grid: 2 } }),
+            },
+            global: { plugins: [createXelqunForms()] },
+        });
+
+        await wrapper.find('input').setValue('-5');
+        await wrapper.find('input').trigger('blur');
+        await flushPromises();
+
+        expect(wrapper.find('[data-xq-table-grid] [data-xq-cell-error]').text()).toBe('Too low.');
+    });
+
+    it('skips a poll while a cell is being typed in', async () => {
+        vi.useFakeTimers();
+
+        const fetchMock = respondWith({});
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, {
+            props: { table: schema({ columns, rows, layout }) },
+            global: { plugins: [createXelqunForms()] },
+            attachTo: document.body,
+        });
+
+        wrapper.find<HTMLInputElement>('input').element.focus();
+        vi.advanceTimersByTime(5000);
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        wrapper.find<HTMLInputElement>('input').element.blur();
+        vi.advanceTimersByTime(5000);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        wrapper.unmount();
+    });
+
+    it('offers no move past the first or last row', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    layout: { ...layout, pollSeconds: null, reorderable: true },
+                    rows: [
+                        { key: '1', cells: { name: { state: 'A' } }, actions: [] },
+                        { key: '2', cells: { name: { state: 'B' } }, actions: [] },
+                    ],
+                }),
+            },
+            global: { plugins: [createXelqunForms()] },
+        });
+        const up = wrapper.findAll('[aria-label="Move up"]');
+        const down = wrapper.findAll('[aria-label="Move down"]');
+
+        expect(up[0].attributes('disabled')).toBeDefined();
+        expect(up[1].attributes('disabled')).toBeUndefined();
+        expect(down[1].attributes('disabled')).toBeDefined();
+        expect(up[1].attributes('aria-describedby')).toBe('xq-products-table-2');
+        expect(wrapper.find('#xq-products-table-2').text()).toBe('B');
+    });
+});
+
+describe('sorting cards', () => {
+    it('sorts a grid from a menu, since cards have no header', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    layout: { grid: 2, striped: false, pollSeconds: null, reorderable: false },
+                    columns: [
+                        {
+                            name: 'name',
+                            type: 'text-column',
+                            label: 'Name',
+                            sortable: true,
+                            props: {},
+                        },
+                    ],
+                }),
+            },
+            global: { plugins: [createXelqunForms()] },
+        });
+
+        expect(wrapper.find('label[for="xq-products-table-sort"]').text()).toBe('Sort by');
+        expect(wrapper.find('#xq-products-table-sort').exists()).toBe(true);
     });
 });

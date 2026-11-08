@@ -57,6 +57,22 @@ class FilteredTable extends Table
     }
 }
 
+class SearchedCategoryTable extends FilteredTable
+{
+    public function filters(): array
+    {
+        return [SelectFilter::make('category')->relationship('category', 'name')->searchable()];
+    }
+}
+
+class FalseDefaultTable extends FilteredTable
+{
+    public function filters(): array
+    {
+        return [TernaryFilter::make('is_featured')->default(false)];
+    }
+}
+
 class CodeFilterTable extends FilteredTable
 {
     public function filters(): array
@@ -193,6 +209,24 @@ it('filters through a relation and lists its records', function () {
     expect(collect($props['options'])->pluck('label')->all())->toBe(['Other', 'Wanted']);
 });
 
+it('searches a related list on the server instead of sending it', function () {
+    $wanted = Category::create(['name' => 'Wanted']);
+    Category::create(['name' => 'Other']);
+    Product::create(['name' => 'In', 'category_id' => $wanted->id]);
+    Product::create(['name' => 'Out']);
+
+    $schema = SearchedCategoryTable::make()->toSchema();
+    $node = json_decode(json_encode(collect($schema['filters']['components'])->firstWhere('path', 'data.category')), true);
+
+    expect($node['props']['options'])->toBe([])
+        ->and($node['props']['async'])->toBeTrue()
+        ->and(names(SearchedCategoryTable::make(), ['category' => (string) $wanted->id]))->toBe(['In']);
+
+    $this->postJson(route('xelqun.forms.search'), ['token' => $schema['filters']['token'], 'path' => 'data.category', 'search' => 'want'])
+        ->assertOk()
+        ->assertJsonPath('options', [['value' => $wanted->id, 'label' => 'Wanted']]);
+});
+
 it('tells yes, no and either apart', function () {
     Product::create(['name' => 'Featured', 'is_featured' => true]);
     Product::create(['name' => 'Plain', 'is_featured' => false]);
@@ -200,6 +234,24 @@ it('tells yes, no and either apart', function () {
     expect(names(FilteredTable::make(), ['is_featured' => '1']))->toBe(['Featured'])
         ->and(names(FilteredTable::make(), ['is_featured' => '0']))->toBe(['Plain'])
         ->and(names(FilteredTable::make(), ['is_featured' => null]))->toBe(['Featured', 'Plain']);
+});
+
+it('reads true and false as yes and no', function () {
+    Product::create(['name' => 'Featured', 'is_featured' => true]);
+    Product::create(['name' => 'Plain', 'is_featured' => false]);
+
+    expect(names(FilteredTable::make(), ['is_featured' => false]))->toBe(['Plain'])
+        ->and(names(FilteredTable::make(), ['is_featured' => true]))->toBe(['Featured']);
+});
+
+it('starts on no when a switch defaults to false, and keeps that out of the url', function () {
+    Product::create(['name' => 'Featured', 'is_featured' => true]);
+    Product::create(['name' => 'Plain', 'is_featured' => false]);
+
+    $response = $this->queryTable(FalseDefaultTable::make())->assertOk();
+
+    expect(collect($response->json('rows'))->pluck('cells.name.state')->all())->toBe(['Plain'])
+        ->and($response->json('query'))->not->toHaveKey('filters');
 });
 
 it('runs a filter\'s query only while it is on', function () {

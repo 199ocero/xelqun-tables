@@ -1,21 +1,29 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
-import { cn, useRegistry, XqAction, XqActionGroup, XqButton, XqCheckbox } from '@xelqun/forms';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-vue-next';
+import {
+    cn,
+    useRegistry,
+    XqAction,
+    XqActionGroup,
+    XqButton,
+    XqCheckbox,
+    XqSelect,
+} from '@xelqun/forms';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-vue-next';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue';
 import { useRowGlide } from '../composables/useRowGlide';
 import { createTableStore } from '../core/store';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
-import type { TableQuery, TableRow, TableSchema } from '../schema/types';
+import type { TableQuery, TableSchema } from '../schema/types';
 import { actionNode } from './actionNode';
 import { builtInCells } from './cells';
-import XqCellLink from './XqCellLink.vue';
 import XqTableBulkBar from './XqTableBulkBar.vue';
 import XqTableColumns from './XqTableColumns.vue';
 import XqTableFilters from './XqTableFilters.vue';
 import XqTablePagination from './XqTablePagination.vue';
+import XqTableRow from './XqTableRow.vue';
 import XqTableScrollbar from './XqTableScrollbar.vue';
 import XqTableSearch from './XqTableSearch.vue';
 
@@ -23,12 +31,13 @@ const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] 
 
 const registry = useRegistry();
 const store = createTableStore(props.table, { onChange: syncUrl });
-const { schema, loading, error, selected, t } = store;
+const { schema, loading, error, canRetry, selected, t } = store;
 const isSupported = computed(() =>
     (SUPPORTED_SCHEMA_VERSIONS as readonly number[]).includes(schema.value.$xq),
 );
 const { glideClass, glideStyle, glideTo, hideGlide } = useRowGlide();
 const scroller = ref<HTMLElement>();
+const root = ref<HTMLElement>();
 
 // New rows may not reach where the pointer is, or may sit somewhere else.
 watch(() => schema.value.rows, hideGlide);
@@ -61,8 +70,10 @@ function toggleColumn(name: string, isVisible: boolean): void {
     }
 }
 
+// Its own computed, so a new row or cell keeps the same columns and the rows that didn't change skip rendering.
+const columnDefinitions = computed(() => schema.value.columns);
 const columns = computed(() =>
-    schema.value.columns
+    columnDefinitions.value
         .filter((column) => !hiddenColumns.value.has(column.name))
         .map((column) => ({
             ...column,
@@ -78,6 +89,7 @@ const selectedOnPage = computed(
 const hasToolbar = computed(
     () =>
         schema.value.searchable ||
+        sortOptions.value.length > 0 ||
         schema.value.filters !== null ||
         toggleableColumns.value.length > 0 ||
         schema.value.headerActions.length > 0,
@@ -102,11 +114,29 @@ function startsGroup(index: number): boolean {
     return row.group !== undefined && row.group !== schema.value.rows[index - 1]?.group;
 }
 
-/** A row's link is in every cell, and Tab should only stop on it once. */
-function isRepeatedRowLink(row: TableRow, name: string): boolean {
-    const first = columns.value.find((column) => !row.cells[column.name].url);
+/** The very first and last rows can't move further, wherever the page is. */
+function canMove(index: number, direction: 'up' | 'down'): boolean {
+    const { page, lastPage } = schema.value.pagination;
 
-    return Boolean(row.url) && !row.cells[name].url && first?.name !== name;
+    return direction === 'up'
+        ? index > 0 || page > 1
+        : index < schema.value.rows.length - 1 || page < lastPage;
+}
+
+/**
+ * A poll would replace what the viewer is in the middle of: a value being
+ * typed, an open dialog, or a request still on its way.
+ */
+function isBusy(): boolean {
+    const focused = document.activeElement;
+
+    return (
+        loading.value ||
+        document.querySelector('[role="dialog"][data-state="open"]') !== null ||
+        (focused instanceof HTMLElement &&
+            root.value?.contains(focused) === true &&
+            focused.matches('input, textarea, select, [contenteditable]'))
+    );
 }
 
 function sortDirection(name: string): 'asc' | 'desc' | null {
@@ -120,6 +150,21 @@ function ariaSort(name: string): 'ascending' | 'descending' | undefined {
 
     return direction ? (direction === 'asc' ? 'ascending' : 'descending') : undefined;
 }
+
+/** Cards have no header to click, so a grid sorts from a menu. */
+const sortOptions = computed(() =>
+    schema.value.layout.grid
+        ? columns.value
+              .filter((column) => column.sortable)
+              .flatMap((column) => [
+                  { value: column.name, label: t(':column, ascending', { column: column.label }) },
+                  {
+                      value: `-${column.name}`,
+                      label: t(':column, descending', { column: column.label }),
+                  },
+              ])
+        : [],
+);
 
 function toggleSort(name: string): void {
     void store.update({ sort: sortDirection(name) === 'asc' ? `-${name}` : name, page: 1 });
@@ -160,7 +205,7 @@ onMounted(() => {
 
     if (schema.value.layout.pollSeconds) {
         pollTimer = setInterval(() => {
-            if (!document.hidden) {
+            if (!document.hidden && !isBusy()) {
                 void store.reload();
             }
         }, schema.value.layout.pollSeconds * 1000);
@@ -182,6 +227,7 @@ onMounted(() => {
 <template>
     <div
         v-if="isSupported"
+        ref="root"
         data-xq-table
         :aria-busy="loading"
         :class="cn('gap-3 grid', props.class)"
@@ -192,7 +238,13 @@ onMounted(() => {
             class="gap-3 px-3 py-2 text-sm rounded-xq-md border-xq-destructive/30 bg-xq-destructive/10 text-xq-destructive flex items-center justify-between border"
         >
             {{ error }}
-            <XqButton type="button" variant="outline" size="sm" @click="store.retry()">
+            <XqButton
+                v-if="canRetry"
+                type="button"
+                variant="outline"
+                size="sm"
+                @click="store.retry()"
+            >
                 {{ t('Retry') }}
             </XqButton>
         </div>
@@ -204,6 +256,19 @@ onMounted(() => {
                 @search="store.update({ search: $event, page: 1 })"
             />
             <div class="ml-auto"></div>
+            <template v-if="sortOptions.length > 0">
+                <label :for="`xq-${schema.id}-sort`" class="sr-only">{{ t('Sort by') }}</label>
+                <XqSelect
+                    :id="`xq-${schema.id}-sort`"
+                    :model-value="schema.sort"
+                    :options="sortOptions"
+                    :placeholder="t('Sort by')"
+                    class="w-56"
+                    @update:model-value="
+                        store.update({ sort: $event == null ? undefined : String($event), page: 1 })
+                    "
+                />
+            </template>
             <XqTableFilters
                 v-if="schema.filters"
                 :key="schema.filters.token ?? undefined"
@@ -289,6 +354,14 @@ onMounted(() => {
                                 :cell="row.cells[column.name]"
                                 @update="store.updateCell(row.key, column.name, $event)"
                             />
+                            <p
+                                v-if="row.cells[column.name]?.error"
+                                role="alert"
+                                class="mt-1 text-xs text-xq-destructive"
+                                data-xq-cell-error
+                            >
+                                {{ row.cells[column.name].error }}
+                            </p>
                         </div>
                         <div v-if="row.actions.length > 0" class="gap-1 flex justify-end">
                             <component
@@ -375,100 +448,19 @@ onMounted(() => {
                                     {{ row.group }}
                                 </th>
                             </tr>
-                            <tr
-                                :class="
-                                    cn(
-                                        'border-xq-border animate-xq-rise-in border-b transition-colors duration-(--xq-duration-fast) last:border-b-0',
-                                        selected.has(row.key) && 'bg-xq-accent/60',
-                                    )
-                                "
-                                :style="staggered(index)"
-                                data-xq-table-row
-                            >
-                                <td v-if="schema.layout.reorderable" class="px-1 py-2">
-                                    <div class="gap-0.5 grid">
-                                        <button
-                                            type="button"
-                                            class="text-xq-muted-foreground hover:text-xq-foreground cursor-pointer"
-                                            :aria-label="t('Move up')"
-                                            @click="store.moveRow(row.key, 'up')"
-                                        >
-                                            <ChevronUp class="size-4" aria-hidden="true" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="text-xq-muted-foreground hover:text-xq-foreground cursor-pointer"
-                                            :aria-label="t('Move down')"
-                                            @click="store.moveRow(row.key, 'down')"
-                                        >
-                                            <ChevronDown class="size-4" aria-hidden="true" />
-                                        </button>
-                                    </div>
-                                </td>
-                                <td v-if="hasSelection" class="px-3 py-2">
-                                    <XqCheckbox
-                                        :model-value="selected.has(row.key)"
-                                        :aria-label="t('Select row')"
-                                        @update:model-value="store.toggleRow(row.key, $event)"
-                                    />
-                                </td>
-                                <td
-                                    v-for="column in columns"
-                                    :key="column.name"
-                                    :class="
-                                        cn(
-                                            'px-3 py-2',
-                                            column.props.wrap && 'min-w-60 whitespace-normal',
-                                        )
-                                    "
-                                >
-                                    <component
-                                        :is="column.cell"
-                                        v-if="column.cell && column.props.editable"
-                                        :column="column"
-                                        :cell="row.cells[column.name]"
-                                        @update="store.updateCell(row.key, column.name, $event)"
-                                    />
-                                    <XqCellLink
-                                        v-else-if="column.cell"
-                                        :url="row.cells[column.name].url ?? row.url"
-                                        :new-tab="
-                                            row.cells[column.name].url
-                                                ? column.opensInNewTab
-                                                : false
-                                        "
-                                        :quiet="!row.cells[column.name].url"
-                                        :tabindex="
-                                            isRepeatedRowLink(row, column.name) ? -1 : undefined
-                                        "
-                                    >
-                                        <component
-                                            :is="column.cell"
-                                            :column="column"
-                                            :cell="row.cells[column.name]"
-                                        />
-                                    </XqCellLink>
-                                    <span v-else class="text-xq-destructive">
-                                        {{ t('Unknown column type: :type', { type: column.type }) }}
-                                    </span>
-                                </td>
-                                <td v-if="hasRowActions" class="px-3 py-2">
-                                    <div class="gap-1 flex justify-end">
-                                        <component
-                                            :is="action.actions ? XqActionGroup : XqAction"
-                                            v-for="action in row.actions"
-                                            :key="action.name"
-                                            :node="actionNode(action)"
-                                            :runner="
-                                                store.actionRunner({
-                                                    kind: 'record',
-                                                    record: row.key,
-                                                })
-                                            "
-                                        />
-                                    </div>
-                                </td>
-                            </tr>
+                            <XqTableRow
+                                :row="row"
+                                :index="index"
+                                :columns="columns"
+                                :store="store"
+                                :is-selected="selected.has(row.key)"
+                                :has-selection="hasSelection"
+                                :has-row-actions="hasRowActions"
+                                :reorderable="schema.layout.reorderable"
+                                :can-move-up="canMove(index, 'up')"
+                                :can-move-down="canMove(index, 'down')"
+                                :title-id="`xq-${schema.id}-${row.key}`"
+                            />
                         </template>
                         <tr v-if="schema.rows.length === 0">
                             <td

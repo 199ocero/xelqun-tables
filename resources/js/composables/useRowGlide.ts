@@ -23,12 +23,21 @@ export function useRowGlide() {
     const width = ref(0);
     const isVisible = ref(false);
     const isGliding = ref(false);
+    let current: HTMLElement | null = null;
+    let frame = 0;
 
     function hideGlide(): void {
+        cancelAnimationFrame(frame);
+        current = null;
         isVisible.value = false;
         isGliding.value = false;
     }
 
+    /**
+     * mouseover fires for every child, and for every row that scrolls under a
+     * still pointer. Measuring a big table forces a layout, so it measures once
+     * a frame, and only when the row changed.
+     */
     function glideTo(event: Event): void {
         const row = (event.target as HTMLElement).closest<HTMLElement>('[data-xq-table-row]');
         const area = event.currentTarget as HTMLElement;
@@ -39,12 +48,20 @@ export function useRowGlide() {
             return;
         }
 
-        // The first row of a visit appears where it is, rather than sliding in from the last visit.
-        isGliding.value = isVisible.value;
-        isVisible.value = true;
-        top.value = offsetWithin(row, area);
-        height.value = Math.floor(row.getBoundingClientRect().height);
-        width.value = area.scrollWidth;
+        if (row === current) {
+            return;
+        }
+
+        current = row;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+            // The first row of a visit appears where it is, rather than sliding in from the last visit.
+            isGliding.value = isVisible.value;
+            isVisible.value = true;
+            top.value = offsetWithin(row, area);
+            height.value = Math.floor(row.getBoundingClientRect().height);
+            width.value = area.scrollWidth;
+        });
     }
 
     const glideClass = computed(() => [

@@ -344,7 +344,8 @@ describe('table store', () => {
         await store.actionRunner({ kind: 'bulk' }).runAction(node as any);
 
         expect(store.selected.value.size).toBe(1);
-        expect(store.error.value).toBe('That action could not run.');
+        expect(store.error.value).toBe("You aren't allowed to do that.");
+        expect(store.canRetry.value).toBe(false);
     });
 
     it('says an old page has expired', async () => {
@@ -422,7 +423,7 @@ describe('updateCell', () => {
         vi.unstubAllGlobals();
     });
 
-    it('shows why a value was refused, and hands the cell back so it can reset', async () => {
+    it('shows why a value was refused on the cell, and keeps the rest of the table as it was', async () => {
         vi.stubGlobal(
             'fetch',
             vi.fn(
@@ -433,14 +434,15 @@ describe('updateCell', () => {
             ),
         );
 
-        const store = createTableStore({ ...schema(), rows: [row] });
+        const other = { ...row, key: '2' };
+        const store = createTableStore({ ...schema(), rows: [row, other] });
         const before = store.schema.value.rows[0].cells.name;
 
         await store.updateCell('1', 'name', 'x'.repeat(99));
 
-        expect(store.error.value).toBe('Too long.');
-        expect(store.schema.value.rows[0].cells.name).toEqual(before);
-        expect(store.schema.value.rows[0].cells.name).not.toBe(before);
+        expect(store.error.value).toBeNull();
+        expect(store.schema.value.rows[0].cells.name).toEqual({ ...before, error: 'Too long.' });
+        expect(store.schema.value.rows[1]).toBe(other);
         vi.unstubAllGlobals();
     });
 });
