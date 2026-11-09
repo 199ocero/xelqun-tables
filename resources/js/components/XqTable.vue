@@ -9,7 +9,7 @@ import {
     XqCheckbox,
     XqSelect,
 } from '@xelqun/forms';
-import { ArrowDown, ArrowUp, ChevronsUpDown, X } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, X } from '@lucide/vue';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, provide, ref, watch } from 'vue';
 import { useRowGlide } from '../composables/useRowGlide';
@@ -29,10 +29,22 @@ import XqTableRow from './XqTableRow.vue';
 import XqTableScrollbar from './XqTableScrollbar.vue';
 import XqTableSearch from './XqTableSearch.vue';
 
-const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] }>();
+const props = defineProps<{
+    table: TableSchema;
+    class?: HTMLAttributes['class'];
+    /** Pick rows instead of acting on them, as a ModalTableSelect does. */
+    pick?: 'single' | 'multiple';
+}>();
+/** The picked rows' keys, while picking. */
+const picked = defineModel<string[]>('picked', { default: () => [] });
+const emit = defineEmits<{ rows: [rows: TableSchema['rows']] }>();
 
 const registry = useRegistry();
-const store = createTableStore(props.table, { onChange: syncUrl });
+// A picker keeps its rows out of the URL, since the page has a form of its own.
+const store = createTableStore(props.table, {
+    onChange: props.pick ? undefined : syncUrl,
+    keepsSelection: !!props.pick,
+});
 const { schema, loading, error, canRetry, selected, t } = store;
 
 provide(TABLE_TRANSLATOR, t);
@@ -86,7 +98,32 @@ const columns = computed(() =>
 );
 
 const hasRowActions = computed(() => schema.value.rows.some((row) => row.actions.length > 0));
-const hasSelection = computed(() => schema.value.bulkActions.length > 0);
+const hasSelection = computed(() => !!props.pick || schema.value.bulkActions.length > 0);
+
+if (props.pick) {
+    selected.value = new Set(picked.value);
+
+    // The picker learns the labels of the rows it shows, for rows picked on any page.
+    watch(
+        () => schema.value.rows,
+        (rows) => emit('rows', rows),
+        { immediate: true },
+    );
+
+    watch(selected, (next, previous) => {
+        // Picking a row when one is picked already swaps them, so a single pick holds one key.
+        if (props.pick === 'single' && next.size > 1) {
+            const added = [...next].find((key) => !previous.has(key));
+
+            selected.value = new Set(added ? [added] : []);
+
+            return;
+        }
+
+        picked.value = [...next];
+    });
+}
+
 const selectedOnPage = computed(
     () => schema.value.rows.filter((row) => selected.value.has(row.key)).length,
 );
@@ -146,6 +183,24 @@ const columnGroups = computed(() => {
 
     return runs;
 });
+
+const groupOptions = computed(() => [
+    { value: '', label: t('No grouping') },
+    ...(schema.value.groups ?? []).map((group) => ({ value: group.name, label: group.label })),
+]);
+const activeGroup = computed(() =>
+    (schema.value.groups ?? []).find((group) => group.name === schema.value.group),
+);
+const collapsedGroups = ref(new Set<string>());
+
+function toggleGroup(label: string): void {
+    const next = new Set(collapsedGroups.value);
+
+    if (!next.delete(label)) {
+        next.add(label);
+    }
+    collapsedGroups.value = next;
+}
 
 const hasColumnSearch = computed(() =>
     columns.value.some((column) => column.searchableIndividually),
@@ -280,6 +335,12 @@ onMounted(() => {
         return;
     }
 
+    if (props.pick) {
+        void store.load(schema.value.query);
+
+        return;
+    }
+
     // Inertia restores the old prop on Back, and the URL is the newer of the two.
     const inUrl = readQuery(window.location.search, schema.value.id);
 
@@ -346,6 +407,17 @@ onMounted(() => {
                     "
                 />
             </template>
+            <template v-if="schema.groups?.length">
+                <label :for="`xq-${schema.id}-group`" class="sr-only">{{ t('Group by') }}</label>
+                <XqSelect
+                    :id="`xq-${schema.id}-group`"
+                    :model-value="schema.group ?? ''"
+                    :options="groupOptions"
+                    :placeholder="t('Group by')"
+                    class="w-48"
+                    @update:model-value="store.update({ group: String($event ?? ''), page: 1 })"
+                />
+            </template>
             <XqTableFilters
                 v-if="schema.filters"
                 :key="schema.filters.token ?? undefined"
@@ -394,7 +466,7 @@ onMounted(() => {
             </span>
         </div>
         <XqTableBulkBar
-            v-if="selected.size > 0"
+            v-if="selected.size > 0 && !pick"
             :count="selected.size"
             :total="schema.pagination.total ?? null"
             :max="schema.maxSelectable"
@@ -590,10 +662,29 @@ onMounted(() => {
                                     scope="colgroup"
                                     class="px-3 py-2 text-sm font-medium bg-xq-muted text-left"
                                 >
-                                    {{ row.group }}
+                                    <button
+                                        v-if="activeGroup?.collapsible"
+                                        type="button"
+                                        class="gap-1.5 flex cursor-pointer items-center"
+                                        :aria-expanded="!collapsedGroups.has(row.group!)"
+                                        @click="toggleGroup(row.group!)"
+                                    >
+                                        <ChevronDown
+                                            :class="
+                                                cn(
+                                                    'size-4 transition-transform duration-(--xq-duration-base)',
+                                                    collapsedGroups.has(row.group!) && '-rotate-90',
+                                                )
+                                            "
+                                            aria-hidden="true"
+                                        />
+                                        {{ row.group }}
+                                    </button>
+                                    <template v-else>{{ row.group }}</template>
                                 </th>
                             </tr>
                             <XqTableRow
+                                v-if="row.group === undefined || !collapsedGroups.has(row.group)"
                                 :row="row"
                                 :index="index"
                                 :columns="columns"

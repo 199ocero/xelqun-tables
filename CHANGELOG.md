@@ -30,6 +30,8 @@ This needs `xelqun/forms` 0.9.
 - **`deferFilters(false)`** applies each filter as it changes, with no Apply button.
 - **`TernaryFilter::trueLabel()`**, **`falseLabel()`**, **`placeholder()`**, **`nullable()`** and **`queries(true:, false:, blank:)`**. A filter can narrow the query while it's off through `applyWhenInactive()`.
 - **`persistSearchInSession()`**, **`persistSortInSession()`**, **`persistFiltersInSession()`** and **`persistColumnSearchesInSession()`**. A link with state of its own wins over what the session kept.
+- **`groups(['status', Group::make('category.name')->collapsible()])`** lets the viewer pick how rows are grouped, or not grouped, and fold a collapsible group away.
+- **`ModalTableSelect`**, a form field that picks related records from a table in a modal, with its search, filters and pages. It takes `relationship()` and `tableConfiguration(CategoriesTable::class)`, and the server checks each picked key against the relationship. Register `tablesPlugin()` with `createXelqunForms({ plugins: [tablesPlugin()] })`. Give the picker table a column named after the relationship's title attribute, so a new pick shows its label.
 - A chip for each active filter, which removes it. **`indicateUsing()`** on a filter says what its chip reads.
 
 ### Fixed

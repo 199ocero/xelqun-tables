@@ -33,6 +33,7 @@ final class TableState
         public readonly array $filters = [],
         public readonly array $columnSearches = [],
         public readonly ?string $cursor = null,
+        public readonly ?string $group = null,
     ) {}
 
     /**
@@ -56,6 +57,12 @@ final class TableState
             filters: self::readFilters($input['filters'] ?? [], $table),
             columnSearches: self::readColumnSearches($input['column_search'] ?? [], $table),
             cursor: is_string($cursor) && strlen($cursor) <= 1000 ? $cursor : null,
+            // An empty group means none, which a viewer can pick over the default. Laravel may turn its '' into null.
+            group: match (true) {
+                array_key_exists('group', $input) && in_array($input['group'], ['', null], true) => null,
+                is_string($input['group'] ?? null) && $table->isGroupAllowed($input['group']) => $input['group'],
+                default => $table->getDefaultGroup(),
+            },
         );
     }
 
@@ -133,7 +140,7 @@ final class TableState
 
     public function withPage(int $page): self
     {
-        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters, $this->columnSearches, $this->cursor);
+        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters, $this->columnSearches, $this->cursor, $this->group);
     }
 
     /**
@@ -158,6 +165,7 @@ final class TableState
             'column_search' => $this->columnSearches === [] ? null : $this->columnSearches,
             'page' => $this->page > 1 ? $this->page : null,
             'cursor' => $this->cursor,
+            'group' => $this->group === $table->getDefaultGroup() ? null : ($this->group ?? ''),
             'per_page' => $this->perPage === ($table->getPaginationPageOptions()[0] === 'all' ? 0 : $table->getPaginationPageOptions()[0]) ? null : ($this->perPage === 0 ? 'all' : $this->perPage),
         ], fn (mixed $value): bool => $value !== null);
     }

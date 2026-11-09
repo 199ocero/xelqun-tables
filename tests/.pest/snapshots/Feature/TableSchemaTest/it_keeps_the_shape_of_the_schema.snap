@@ -46,6 +46,7 @@
     "sort": null,
     "activeFilters": 0,
     "indicators": [],
+    "group": null,
     "bulkActions": [],
     "summaries": [],
     "rows": [

@@ -12,6 +12,8 @@ import type { TableCell, TableQuery, TableResult, TableSchema } from '../schema/
 export interface TableStoreOptions {
     /** Runs after the server answers, with the state to put in the URL. */
     onChange?: (query: TableQuery) => void;
+    /** Keep the selection through searches and filters, for picking rows rather than acting on them. */
+    keepsSelection?: boolean;
 }
 
 export type TableStore = ReturnType<typeof createTableStore>;
@@ -101,7 +103,7 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
      */
     function update(changes: TableQuery): Promise<void> {
         // Otherwise a bulk action could reach rows the viewer can no longer see.
-        if ('search' in changes || 'filters' in changes) {
+        if (!options.keepsSelection && ('search' in changes || 'filters' in changes)) {
             clearSelection();
         }
 

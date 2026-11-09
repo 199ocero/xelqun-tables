@@ -38,6 +38,9 @@ abstract class Table
 {
     private ?string $groupColumn = null;
 
+    /** @var array<string, Group> By column. */
+    private array $groups = [];
+
     private ?int $contentGridColumns = null;
 
     private ?int $pollSeconds = null;
@@ -482,6 +485,41 @@ abstract class Table
     }
 
     /**
+     * Groupings the viewer picks from, as column names or Group objects.
+     *
+     * @param  array<int, string|Group>  $groups
+     */
+    public function groups(array $groups): static
+    {
+        $this->groups = [];
+
+        foreach ($groups as $group) {
+            $group = is_string($group) ? Group::make($group) : $group;
+            $this->groups[$group->getColumn()] = $group;
+        }
+
+        return $this;
+    }
+
+    /**
+     * The grouping a viewer may ask for: one of groups(), or the default.
+     *
+     * @internal
+     */
+    public function isGroupAllowed(string $column): bool
+    {
+        return isset($this->groups[$column]) || $column === $this->groupColumn;
+    }
+
+    /**
+     * @internal
+     */
+    public function getDefaultGroup(): ?string
+    {
+        return $this->groupColumn;
+    }
+
+    /**
      * Show rows as cards, this many across on a wide screen.
      */
     public function contentGrid(int $columns): static
@@ -710,6 +748,7 @@ abstract class Table
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),
             ...($this->hasDeferredFilters ? [] : ['liveFilters' => true]),
+            ...($this->groups === [] ? [] : ['groups' => array_values(array_map(fn (Group $group): array => $group->toArray(), $this->groups))]),
             ...($this->isLoadingDeferred ? ['deferred' => true] : []),
             ...$result,
         ];
@@ -734,6 +773,7 @@ abstract class Table
             'sort' => $state->sort,
             'activeFilters' => count($this->getActiveFilters($state)),
             'indicators' => $this->getIndicators($state),
+            'group' => $state->group,
             // Here and not in the first render, so a filter can change which bulk actions make sense.
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'summaries' => $this->getSummaries($state),
@@ -741,7 +781,7 @@ abstract class Table
                 'key' => (string) $record->getKey(),
                 ...array_filter([
                     'url' => SafeUrl::filter($this->recordUrl($record)),
-                    'group' => $this->getRowGroup($record),
+                    'group' => $this->getRowGroup($record, $state->group),
                     'action' => $hasRecordActions ? $this->recordAction($record) : null,
                 ]),
                 ...($this->isRecordSelectable($record) ? [] : ['selectable' => false]),
@@ -806,6 +846,7 @@ abstract class Table
             'sort' => $state->sort,
             'activeFilters' => count($this->getActiveFilters($state)),
             'indicators' => [],
+            'group' => $state->group,
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'summaries' => [],
             'rows' => [],
@@ -839,36 +880,36 @@ abstract class Table
      *
      * @param  Builder<covariant Model>  $query
      */
-    private function applyGroupOrder(Builder $query): void
+    private function applyGroupOrder(Builder $query, string $group): void
     {
-        if (! str_contains((string) $this->groupColumn, '.')) {
-            $query->orderBy($query->qualifyColumn((string) $this->groupColumn));
+        if (! str_contains($group, '.')) {
+            $query->orderBy($query->qualifyColumn($group));
 
             return;
         }
 
-        $column = array_find($this->getColumns(), fn (Column $column): bool => $column->getName() === $this->groupColumn);
+        $column = array_find($this->getColumns(), fn (Column $column): bool => $column->getName() === $group);
 
         if ($column === null) {
-            throw new TableDefinitionException("Group by [{$this->groupColumn}] needs a column with that name.");
+            throw new TableDefinitionException("Group by [{$group}] needs a column with that name.");
         }
 
         $column->applySort($query, 'asc');
     }
 
-    private function getRowGroup(Model $record): ?string
+    private function getRowGroup(Model $record, ?string $group): ?string
     {
-        if ($this->groupColumn === null) {
+        if ($group === null) {
             return null;
         }
 
         foreach ($this->getColumns() as $column) {
-            if ($column->getName() === $this->groupColumn) {
+            if ($column->getName() === $group) {
                 return (string) ($column->toCell($record)['state'] ?? '');
             }
         }
 
-        return (string) $record->getAttribute($this->groupColumn);
+        return (string) $record->getAttribute($group);
     }
 
     /**
@@ -973,12 +1014,12 @@ abstract class Table
             }
         }
 
-        if ($this->groupColumn !== null) {
+        if ($state->group !== null) {
             // Ahead of any sort, so a group's rows stay together.
             $orders = $query->getQuery()->orders ?? [];
             $orderBindings = $query->getQuery()->bindings['order'];
             $query->reorder();
-            $this->applyGroupOrder($query);
+            $this->applyGroupOrder($query, $state->group);
             $query->getQuery()->orders = [...$query->getQuery()->orders ?? [], ...$orders];
             $query->getQuery()->bindings['order'] = [...$query->getQuery()->bindings['order'], ...$orderBindings];
         }

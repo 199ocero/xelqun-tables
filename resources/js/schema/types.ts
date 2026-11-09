@@ -76,6 +76,8 @@ export interface TableResult {
     /** A column's name, with a leading "-" for descending. */
     sort: string | null;
     activeFilters: number;
+    /** The column the rows are grouped by, if any. */
+    group?: string | null;
     /** A chip for each active filter, with the fields that removing it clears. */
     indicators?: Array<{ label: string; fields: string[] }>;
     summaries: Record<string, Array<{ label: string | null; value: unknown }>>;
@@ -109,6 +111,8 @@ export interface TableSchema extends TableResult {
     liveFilters?: boolean;
     /** The rows load after the first render. */
     deferred?: boolean;
+    /** Groupings the viewer picks from. */
+    groups?: Array<{ name: string; label: string; collapsible?: boolean }>;
     messages?: Record<string, string>;
     columns: TableColumn[];
 }

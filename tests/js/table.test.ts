@@ -1,10 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick } from 'vue';
-import { createXelqunForms, defaultComponents } from '@xelqun/forms';
+import { createFormStore, createXelqunForms, defaultComponents, XqForm } from '@xelqun/forms';
 import { fieldNode, formSchema } from '@xelqun/forms/testing';
 import { builtInCells } from '../../resources/js/components/cells';
 import XqTable from '../../resources/js/components/XqTable.vue';
+import { tablesPlugin } from '../../resources/js';
 import type { TableSchema } from '../../resources/js/schema/types';
 
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -1605,5 +1606,77 @@ describe('pagination modes and loading', () => {
         await flushPromises();
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('groups and picking', () => {
+    it('regroups from the picker and folds a collapsible group', async () => {
+        const fetchMock = respondWith({ ...schema() });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    groups: [{ name: 'status', label: 'Status', collapsible: true }],
+                    group: 'status',
+                    rows: [
+                        { key: '1', group: 'live', cells: { name: { state: 'A' } }, actions: [] },
+                        { key: '2', group: 'live', cells: { name: { state: 'B' } }, actions: [] },
+                    ],
+                }),
+            },
+        });
+
+        expect(wrapper.findAll('[data-xq-table-row]')).toHaveLength(2);
+
+        await wrapper.find('[data-xq-table-group] button').trigger('click');
+
+        expect(wrapper.findAll('[data-xq-table-row]')).toHaveLength(0);
+    });
+
+    it('sets a ModalTableSelect to the rows picked in its table', async () => {
+        const table = schema({
+            rows: [
+                { key: '7', cells: { name: { state: 'Desks' } }, actions: [] },
+                { key: '8', cells: { name: { state: 'Lamps' } }, actions: [] },
+            ],
+        });
+
+        vi.stubGlobal('fetch', respondWith({ ...table }));
+
+        const form = createFormStore(
+            formSchema(
+                [
+                    fieldNode('data.category_id', 'xelqun/modal-table-select', {
+                        props: { options: [], titleAttribute: 'name', table },
+                    }),
+                ],
+                { category_id: null },
+            ),
+        );
+        const wrapper = mount(XqForm, {
+            props: { form },
+            global: { plugins: [createXelqunForms({ plugins: [tablesPlugin()] })] },
+            attachTo: document.body,
+        });
+
+        await vi.dynamicImportSettled();
+        await flushPromises();
+        await wrapper.find('[data-xq-modal-table-select] button').trigger('click');
+        await flushPromises();
+
+        const checkboxes = document.body.querySelectorAll<HTMLElement>(
+            '[data-xq-table-row] [role="checkbox"]',
+        );
+
+        checkboxes[1].click();
+        await flushPromises();
+        document.body.querySelector<HTMLElement>('[data-xq-pick-confirm]')!.click();
+        await flushPromises();
+
+        expect(form.get('data.category_id')).toBe('8');
+        expect(wrapper.find('[data-xq-modal-table-select]').text()).toContain('Lamps');
+        wrapper.unmount();
     });
 });
