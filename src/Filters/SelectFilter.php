@@ -151,4 +151,14 @@ class SelectFilter extends BaseFilter
     {
         return (array) ($data[$this->name] ?? []) !== [];
     }
+
+    protected function getDefaultIndicator(array $data): string
+    {
+        $values = (array) ($data[$this->name] ?? []);
+        $labels = $this->relationship === null
+            ? array_values(array_intersect_key($this->getOptions(), array_flip(array_map('strval', $values))))
+            : $this->getRelatedQuery()->whereKey($values)->pluck($this->titleAttribute)->all();
+
+        return $this->getLabel().': '.implode(', ', $labels);
+    }
 }

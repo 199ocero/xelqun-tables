@@ -45,6 +45,7 @@
     "query": {},
     "sort": null,
     "activeFilters": 0,
+    "indicators": [],
     "bulkActions": [],
     "summaries": [],
     "rows": [

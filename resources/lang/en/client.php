@@ -29,6 +29,7 @@ return [
     'Page :current of :last' => 'Page :current of :last',
     'Per page' => 'Per page',
     'Previous page' => 'Previous page',
+    'Remove filter: :filter' => 'Remove filter: :filter',
     'Reset' => 'Reset',
     'Retry' => 'Retry',
     'Save' => 'Save',

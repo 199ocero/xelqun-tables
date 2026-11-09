@@ -21,7 +21,7 @@ class ActionController
         $validated = $request->validate([
             'token' => ['required', 'string'],
             'action' => ['required', 'string', 'max:255'],
-            'kind' => ['required', Rule::in([TableActionHost::RECORD, TableActionHost::HEADER, TableActionHost::BULK])],
+            'kind' => ['required', Rule::in([TableActionHost::RECORD, TableActionHost::HEADER, TableActionHost::BULK, TableActionHost::EMPTY])],
             'phase' => ['required', 'in:mount,run'],
             'record' => ['required_if:kind,'.TableActionHost::RECORD, 'nullable', 'string', 'max:255'],
             'records' => ['required_if:kind,'.TableActionHost::BULK, 'array'],

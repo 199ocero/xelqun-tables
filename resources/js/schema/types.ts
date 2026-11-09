@@ -10,6 +10,13 @@ export interface TableColumn {
     toggleable?: boolean;
     hiddenByDefault?: boolean;
     opensInNewTab?: boolean;
+    alignment?: 'start' | 'center' | 'end';
+    /** Any CSS width. */
+    width?: string;
+    grow?: boolean;
+    wrapHeader?: boolean;
+    /** The heading of the ColumnGroup it sits in. */
+    group?: string;
     props: Record<string, any>;
 }
 
@@ -54,6 +61,8 @@ export interface TableResult {
     /** A column's name, with a leading "-" for descending. */
     sort: string | null;
     activeFilters: number;
+    /** A chip for each active filter, with the fields that removing it clears. */
+    indicators?: Array<{ label: string; fields: string[] }>;
     summaries: Record<string, Array<{ label: string | null; value: unknown }>>;
     bulkActions: TableAction[];
     rows: TableRow[];
@@ -74,7 +83,10 @@ export interface TableSchema extends TableResult {
     };
     headerActions: TableAction[];
     maxSelectable: number;
-    emptyState?: { heading: string; description: string | null };
+    emptyState?: { heading: string; description?: string; icon?: string };
+    emptyStateActions?: TableAction[];
+    heading?: string;
+    description?: string;
     searchable: boolean;
     filters: FormSchema | null;
     filterDefaults: Record<string, unknown>;

@@ -51,6 +51,16 @@ abstract class Column
 
     protected string|Closure|null $tooltip = null;
 
+    protected ?string $alignment = null;
+
+    protected ?string $width = null;
+
+    protected bool $grows = false;
+
+    protected bool $wrapsHeader = false;
+
+    protected ?string $group = null;
+
     protected bool $opensUrlInNewTab = false;
 
     protected bool $isSortable = false;
@@ -159,6 +169,56 @@ abstract class Column
     public function tooltip(string|Closure|null $tooltip): static
     {
         $this->tooltip = $tooltip;
+
+        return $this;
+    }
+
+    /**
+     * start, center or end, for the heading, the cells and the summary.
+     */
+    public function alignment(?string $alignment): static
+    {
+        $this->alignment = $alignment;
+
+        return $this;
+    }
+
+    /**
+     * Any CSS width, such as '8rem' or '20%'.
+     */
+    public function width(?string $width): static
+    {
+        $this->width = $width;
+
+        return $this;
+    }
+
+    /**
+     * Take the room the other columns leave.
+     */
+    public function grow(bool $condition = true): static
+    {
+        $this->grows = $condition;
+
+        return $this;
+    }
+
+    /**
+     * Let a long heading run onto more lines.
+     */
+    public function wrapHeader(bool $condition = true): static
+    {
+        $this->wrapsHeader = $condition;
+
+        return $this;
+    }
+
+    /**
+     * @internal Set by ColumnGroup.
+     */
+    public function inGroup(string $label): static
+    {
+        $this->group = $label;
 
         return $this;
     }
@@ -561,6 +621,13 @@ abstract class Column
             ...($this->opensUrlInNewTab ? ['opensInNewTab' => true] : []),
             ...($this->isToggleable ? ['toggleable' => true] : []),
             ...($this->isHiddenByDefault ? ['hiddenByDefault' => true] : []),
+            ...array_filter([
+                'alignment' => $this->alignment,
+                'width' => $this->width,
+                'grow' => $this->grows,
+                'wrapHeader' => $this->wrapsHeader,
+                'group' => $this->group,
+            ]),
             'props' => (object) $this->getProps(),
         ];
     }

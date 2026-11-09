@@ -40,6 +40,11 @@ class TernaryFilter extends BaseFilter
         $query->where($query->qualifyColumn($this->attribute ?? $this->name), (bool) $data[$this->name]);
     }
 
+    protected function getDefaultIndicator(array $data): string
+    {
+        return $this->getLabel().': '.__((bool) $data[$this->name] ? 'xelqun-tables::messages.yes' : 'xelqun-tables::messages.no');
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */

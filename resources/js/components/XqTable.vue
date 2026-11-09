@@ -9,7 +9,7 @@ import {
     XqCheckbox,
     XqSelect,
 } from '@xelqun/forms';
-import { ArrowDown, ArrowUp, ChevronsUpDown } from '@lucide/vue';
+import { ArrowDown, ArrowUp, ChevronsUpDown, X } from '@lucide/vue';
 import type { HTMLAttributes } from 'vue';
 import { computed, onMounted, onScopeDispose, provide, ref, watch } from 'vue';
 import { useRowGlide } from '../composables/useRowGlide';
@@ -17,11 +17,12 @@ import { createTableStore } from '../core/store';
 import { TABLE_TRANSLATOR } from '../core/translator';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
-import type { TableQuery, TableSchema } from '../schema/types';
+import type { TableColumn, TableQuery, TableSchema } from '../schema/types';
 import { actionNode } from './actionNode';
 import { builtInCells } from './cells';
 import XqTableBulkBar from './XqTableBulkBar.vue';
 import XqTableColumns from './XqTableColumns.vue';
+import XqTableEmptyState from './XqTableEmptyState.vue';
 import XqTableFilters from './XqTableFilters.vue';
 import XqTablePagination from './XqTablePagination.vue';
 import XqTableRow from './XqTableRow.vue';
@@ -105,6 +106,53 @@ const columnCount = computed(
         (hasRowActions.value ? 1 : 0) +
         (schema.value.layout.reorderable ? 1 : 0),
 );
+
+const alignments: Record<string, string> = {
+    start: 'text-left',
+    center: 'text-center',
+    end: 'text-right',
+};
+
+/** Classes and style a column's heading, cells and summary share. */
+function columnClass(column: TableColumn): string {
+    return alignments[column.alignment ?? 'start'] ?? alignments.start;
+}
+
+function columnStyle(column: TableColumn): Record<string, string> | undefined {
+    if (column.grow) {
+        return { width: '100%' };
+    }
+
+    return column.width ? { width: column.width, minWidth: column.width } : undefined;
+}
+
+/** Runs of neighbouring columns under one group heading, or none. */
+const columnGroups = computed(() => {
+    if (!columns.value.some((column) => column.group)) {
+        return [];
+    }
+
+    const runs: Array<{ label: string | null; span: number }> = [];
+
+    for (const column of columns.value) {
+        const last = runs[runs.length - 1];
+
+        if (last && last.label === (column.group ?? null)) {
+            last.span++;
+        } else {
+            runs.push({ label: column.group ?? null, span: 1 });
+        }
+    }
+
+    return runs;
+});
+
+function removeIndicator(fields: string[]): void {
+    const filters = { ...schema.value.query.filters };
+
+    fields.forEach((field) => (filters[field] = null));
+    store.update({ filters, page: 1 });
+}
 
 /** A short ripple down the top rows. Past these, waiting for it would feel slow. */
 function staggered(index: number): { animationDelay: string } {
@@ -251,6 +299,16 @@ onMounted(() => {
                 {{ t('Retry') }}
             </XqButton>
         </div>
+        <header
+            v-if="schema.heading || schema.description"
+            class="gap-0.5 grid"
+            data-xq-table-heading
+        >
+            <h2 v-if="schema.heading" class="text-base font-semibold">{{ schema.heading }}</h2>
+            <p v-if="schema.description" class="text-sm text-xq-muted-foreground">
+                {{ schema.description }}
+            </p>
+        </header>
         <div v-if="hasToolbar" class="gap-3 flex flex-wrap items-center">
             <XqTableSearch
                 v-if="schema.searchable"
@@ -296,6 +354,27 @@ onMounted(() => {
                 :node="actionNode(action)"
                 :runner="store.actionRunner({ kind: 'header' })"
             />
+        </div>
+        <div
+            v-if="schema.indicators?.length"
+            class="gap-2 flex flex-wrap items-center"
+            data-xq-table-indicators
+        >
+            <span
+                v-for="(indicator, index) in schema.indicators"
+                :key="index"
+                class="gap-1 pl-2.5 pr-1 py-0.5 text-xs border-xq-border bg-xq-muted inline-flex items-center rounded-full border"
+            >
+                {{ indicator.label }}
+                <button
+                    type="button"
+                    class="size-4 hover:bg-xq-accent flex cursor-pointer items-center justify-center rounded-full"
+                    :aria-label="t('Remove filter: :filter', { filter: indicator.label })"
+                    @click="removeIndicator(indicator.fields)"
+                >
+                    <X class="size-3" aria-hidden="true" />
+                </button>
+            </span>
         </div>
         <XqTableBulkBar
             v-if="selected.size > 0"
@@ -376,6 +455,12 @@ onMounted(() => {
                             />
                         </div>
                     </article>
+                    <XqTableEmptyState
+                        v-if="schema.rows.length === 0"
+                        :schema="schema"
+                        :store="store"
+                        class="py-8 text-sm text-xq-muted-foreground col-span-full"
+                    />
                 </div>
                 <table
                     v-else
@@ -387,6 +472,25 @@ onMounted(() => {
                     "
                 >
                     <thead class="border-xq-border bg-xq-muted/50 border-b">
+                        <tr v-if="columnGroups.length" data-xq-table-column-groups>
+                            <th v-if="schema.layout.reorderable"></th>
+                            <th v-if="hasSelection"></th>
+                            <th
+                                v-for="(group, index) in columnGroups"
+                                :key="index"
+                                :colspan="group.span"
+                                :scope="group.label ? 'colgroup' : undefined"
+                                :class="
+                                    cn(
+                                        'px-3 pt-2 font-medium text-xq-foreground text-center',
+                                        group.label && 'border-xq-border border-b',
+                                    )
+                                "
+                            >
+                                {{ group.label }}
+                            </th>
+                            <th v-if="hasRowActions"></th>
+                        </tr>
                         <tr>
                             <th v-if="schema.layout.reorderable" scope="col" class="w-px">
                                 <span class="sr-only">{{ t('Move up') }}</span>
@@ -408,7 +512,14 @@ onMounted(() => {
                                 :key="column.name"
                                 scope="col"
                                 :aria-sort="ariaSort(column.name)"
-                                class="px-3 py-2 font-medium text-xq-muted-foreground text-left"
+                                :class="
+                                    cn(
+                                        'px-3 py-2 font-medium text-xq-muted-foreground',
+                                        columnClass(column),
+                                        column.wrapHeader && 'whitespace-normal',
+                                    )
+                                "
+                                :style="columnStyle(column)"
                             >
                                 <button
                                     v-if="column.sortable"
@@ -467,22 +578,10 @@ onMounted(() => {
                         </template>
                         <tr v-if="schema.rows.length === 0">
                             <td
-                                :colspan="
-                                    columns.length +
-                                    (hasRowActions ? 1 : 0) +
-                                    (hasSelection ? 1 : 0)
-                                "
-                                class="px-3 py-8 text-xq-muted-foreground text-center whitespace-normal"
+                                :colspan="columnCount"
+                                class="px-3 py-8 text-xq-muted-foreground whitespace-normal"
                             >
-                                <template v-if="schema.emptyState">
-                                    <p class="font-medium text-xq-foreground">
-                                        {{ schema.emptyState.heading }}
-                                    </p>
-                                    <p v-if="schema.emptyState.description" class="mt-1">
-                                        {{ schema.emptyState.description }}
-                                    </p>
-                                </template>
-                                <template v-else>{{ t('No records found.') }}</template>
+                                <XqTableEmptyState :schema="schema" :store="store" />
                             </td>
                         </tr>
                     </tbody>
@@ -493,7 +592,12 @@ onMounted(() => {
                             <td
                                 v-for="column in columns"
                                 :key="column.name"
-                                class="px-3 py-2 text-sm font-medium align-top"
+                                :class="
+                                    cn(
+                                        'px-3 py-2 text-sm font-medium align-top',
+                                        columnClass(column),
+                                    )
+                                "
                             >
                                 <p
                                     v-for="(line, position) in schema.summaries[column.name]"

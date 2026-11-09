@@ -90,7 +90,14 @@ const delay = computed(() => ({
             v-for="(column, position) in columns"
             :id="position === 0 ? titleId : undefined"
             :key="column.name"
-            :class="cn('px-3 py-2', column.props.wrap && 'min-w-60 whitespace-normal')"
+            :class="
+                cn(
+                    'px-3 py-2',
+                    column.props.wrap && 'min-w-60 whitespace-normal',
+                    column.alignment === 'center' && 'text-center',
+                    column.alignment === 'end' && 'text-right',
+                )
+            "
             :title="row.cells[column.name]?.tooltip"
         >
             <template v-if="column.cell && column.props.editable">

@@ -29,6 +29,8 @@ abstract class BaseFilter
 
     protected mixed $default = null;
 
+    protected ?Closure $indicateUsing = null;
+
     final public function __construct(protected string $name) {}
 
     public static function make(string $name): static
@@ -79,6 +81,40 @@ abstract class BaseFilter
         $this->default = $value;
 
         return $this;
+    }
+
+    /**
+     * What the chip above the table says while the filter is on. It gets $data,
+     * this filter's values, and returns a string, a list of them, or null for none.
+     */
+    public function indicateUsing(?Closure $callback): static
+    {
+        $this->indicateUsing = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<int, string>
+     */
+    public function getIndicators(array $data): array
+    {
+        if ($this->indicateUsing === null) {
+            return [$this->getDefaultIndicator($data)];
+        }
+
+        return array_values(array_map('strval', array_filter((array) $this->evaluate($this->indicateUsing, ['data' => $data]), fn (mixed $label): bool => $label !== null && $label !== '')));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function getDefaultIndicator(array $data): string
+    {
+        return $this->getLabel();
     }
 
     public function getName(): string

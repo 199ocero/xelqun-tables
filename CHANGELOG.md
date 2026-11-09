@@ -15,6 +15,15 @@ This needs `xelqun/forms` 0.9.
 - **`TextColumn::numeric()`**, **`time()`**, **`since()`** and **`timezone()`**. `date()` and `dateTime()` take a time zone too.
 - **`TextColumn::listWithLineBreaks()`**, **`bulleted()`**, **`limitList()`** and **`expandableLimitedList()`** for a cell that holds a list.
 - An action that calls `$action->halt()` keeps its modal open, and a bulk action keeps its selection.
+- **`Column::alignment()`**, **`width()`**, **`grow()`** and **`wrapHeader()`**.
+- **`ColumnGroup::make('Money', [...])`** puts a heading over neighbouring columns.
+- **`Table::heading()`** and **`description()`** go above the table.
+- **`emptyState()`** takes an icon, and **`Table::emptyStateActions()`** puts buttons in it, such as one that creates the first record.
+- A chip for each active filter, which removes it. **`indicateUsing()`** on a filter says what its chip reads.
+
+### Fixed
+
+- A `contentGrid()` table with no rows shows its empty state, and the empty row of a reorderable table spans every column.
 
 ## 0.6.1 - 2026-11-08
 

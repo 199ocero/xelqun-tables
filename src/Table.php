@@ -17,6 +17,7 @@ use Xelqun\Forms\Support\SafeUrl;
 use Xelqun\Tables\Actions\BulkAction;
 use Xelqun\Tables\Actions\TableActionHost;
 use Xelqun\Tables\Columns\Column;
+use Xelqun\Tables\Columns\ColumnGroup;
 use Xelqun\Tables\Columns\Contracts\Editable;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Filters\BaseFilter;
@@ -59,6 +60,10 @@ abstract class Table
     /** @var array{heading: string, description: string|null}|null */
     private ?array $emptyState = null;
 
+    private ?string $heading = null;
+
+    private ?string $description = null;
+
     /** @var array<int, Column>|null */
     private ?array $mountedColumns = null;
 
@@ -99,7 +104,7 @@ abstract class Table
     abstract public function query(): Builder;
 
     /**
-     * @return array<int, Column>
+     * @return array<int, Column|ColumnGroup>
      */
     abstract public function columns(): array;
 
@@ -428,9 +433,39 @@ abstract class Table
     /**
      * What to show when there are no rows, in place of "No records found."
      */
-    public function emptyState(string $heading, ?string $description = null): static
+    public function emptyState(string $heading, ?string $description = null, ?string $icon = null): static
     {
-        $this->emptyState = ['heading' => $heading, 'description' => $description];
+        $this->emptyState = array_filter(['heading' => $heading, 'description' => $description, 'icon' => $icon], fn (?string $value): bool => $value !== null);
+
+        return $this;
+    }
+
+    /**
+     * Buttons in the empty state, such as one that creates the first record.
+     *
+     * @return array<int, Action|ActionGroup>
+     */
+    public function emptyStateActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * A title above the table, as on a dashboard.
+     */
+    public function heading(?string $heading): static
+    {
+        $this->heading = $heading;
+
+        return $this;
+    }
+
+    /**
+     * Smaller text under the heading.
+     */
+    public function description(?string $description): static
+    {
+        $this->description = $description;
 
         return $this;
     }
@@ -456,7 +491,10 @@ abstract class Table
         }
 
         $columns = array_values(array_filter(
-            array_map(fn (Column $column): Column => $column->mount($this), $this->columns()),
+            array_map(fn (Column $column): Column => $column->mount($this), array_merge(...array_map(
+                fn (Column|ColumnGroup $item): array => $item instanceof Column ? [$item] : $item->getColumns(),
+                $this->columns(),
+            ))),
             fn (Column $column): bool => ! $column->isHidden(),
         ));
         $names = array_map(fn (Column $column): string => $column->getName(), $columns);
@@ -505,6 +543,8 @@ abstract class Table
             'maxSelectable' => $this->maxSelectableRecords,
             'layout' => ['grid' => $this->contentGridColumns, 'striped' => $this->isStriped, 'pollSeconds' => $this->pollSeconds, 'reorderable' => $this->canReorder()],
             ...($this->emptyState === null ? [] : ['emptyState' => $this->emptyState]),
+            ...array_filter(['heading' => $this->heading, 'description' => $this->description]),
+            ...($this->emptyStateActions() === [] ? [] : ['emptyStateActions' => TableActionHost::for($this, TableActionHost::EMPTY)->toActionNodes()]),
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),
             ...$result,
@@ -533,6 +573,7 @@ abstract class Table
             'query' => (object) $state->toQuery($this),
             'sort' => $state->sort,
             'activeFilters' => count($this->getActiveFilters($state)),
+            'indicators' => $this->getIndicators($state),
             // Here and not in the first render, so a filter can change which bulk actions make sense.
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'summaries' => $this->getSummaries($state),
@@ -610,6 +651,26 @@ abstract class Table
         }
 
         return (string) $record->getAttribute($this->groupColumn);
+    }
+
+    /**
+     * A chip for each active filter, with the fields that removing it clears.
+     *
+     * @return array<int, array{label: string, fields: array<int, string>}>
+     */
+    private function getIndicators(TableState $state): array
+    {
+        $indicators = [];
+
+        foreach ($this->getActiveFilters($state) as $filter) {
+            $fields = $filter->getFieldNames();
+
+            foreach ($filter->getIndicators(Arr::only($state->filters, $fields)) as $label) {
+                $indicators[] = ['label' => $label, 'fields' => $fields];
+            }
+        }
+
+        return $indicators;
     }
 
     /**

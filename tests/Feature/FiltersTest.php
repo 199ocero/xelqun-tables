@@ -44,7 +44,7 @@ class FilteredTable extends Table
             SelectFilter::make('kinds')->attribute('status')->multiple()->options(['draft' => 'Draft', 'active' => 'Active']),
             SelectFilter::make('category')->relationship('category', 'name'),
             TernaryFilter::make('is_featured'),
-            Filter::make('priced')->query(fn (Builder $query) => $query->where('price', '>', 0)),
+            Filter::make('priced')->query(fn (Builder $query) => $query->where('price', '>', 0))->indicateUsing(fn (array $data): string => 'With a price'),
             Filter::make('range')
                 ->schema([
                     TextInput::make('min')->numeric(),
@@ -520,4 +520,18 @@ it('checks the table\'s authorize on the filter form\'s own endpoints', function
         'changed' => [],
         'deps' => (object) [],
     ])->assertForbidden();
+});
+
+it('names each active filter in a chip, with the fields removing it clears', function () {
+    $category = Category::create(['name' => 'Desks']);
+
+    $this->queryTable(FilteredTable::make(), ['filters' => ['status' => 'active', 'category' => (string) $category->getKey(), 'is_featured' => '0', 'priced' => true, 'min' => 5]])
+        ->assertOk()
+        ->assertJsonPath('indicators', [
+            ['label' => 'Status: Active', 'fields' => ['status']],
+            ['label' => 'Category: Desks', 'fields' => ['category']],
+            ['label' => 'Is Featured: No', 'fields' => ['is_featured']],
+            ['label' => 'With a price', 'fields' => ['priced']],
+            ['label' => 'Range', 'fields' => ['min', 'max']],
+        ]);
 });

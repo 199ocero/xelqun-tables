@@ -1364,3 +1364,91 @@ describe('text cells', () => {
         expect(wrapper.find('[role="status"]').text()).toBe('Done');
     });
 });
+
+describe('table chrome', () => {
+    it('shows its heading, groups its columns and lines up a column', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    heading: 'Products',
+                    description: 'In stock',
+                    columns: [
+                        {
+                            name: 'name',
+                            type: 'text-column',
+                            label: 'Name',
+                            sortable: false,
+                            props: {},
+                        },
+                        {
+                            name: 'price',
+                            type: 'text-column',
+                            label: 'Price',
+                            sortable: false,
+                            alignment: 'end',
+                            group: 'Money',
+                            props: {},
+                        },
+                    ],
+                    rows: [
+                        {
+                            key: '1',
+                            cells: { name: { state: 'Lamp' }, price: { state: 5 } },
+                            actions: [],
+                        },
+                    ],
+                }),
+            },
+        });
+
+        expect(wrapper.find('[data-xq-table-heading]').text()).toContain('Products');
+        expect(
+            wrapper.findAll('[data-xq-table-column-groups] th').map((cell) => cell.text()),
+        ).toEqual(['', 'Money']);
+        expect(wrapper.findAll('thead tr')[1].findAll('th')[1].classes()).toContain('text-right');
+        expect(wrapper.findAll('[data-xq-table-row] td')[1].classes()).toContain('text-right');
+    });
+
+    it('removes a filter from its chip', async () => {
+        const filtered = schema({
+            query: { filters: { status: 'active', priced: true } },
+            indicators: [{ label: 'Status: Active', fields: ['status'] }],
+        });
+        const fetchMock = respondWith({ ...filtered });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table: filtered } });
+
+        await flushPromises();
+        expect(wrapper.find('[data-xq-table-indicators]').text()).toContain('Status: Active');
+
+        await wrapper.find('[data-xq-table-indicators] button').trigger('click');
+        await flushPromises();
+
+        const last = fetchMock.mock.calls.length - 1;
+
+        expect(JSON.parse(sentBody(fetchMock, last)).query.filters).toEqual({
+            status: null,
+            priced: true,
+        });
+    });
+
+    it('shows the empty state with its icon and actions, in a grid too', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    rows: [],
+                    layout: { grid: 2, striped: false, pollSeconds: null, reorderable: false },
+                    emptyState: { heading: 'No products', icon: 'package' },
+                    emptyStateActions: [
+                        { name: 'create', props: { label: 'Create', style: 'button' } },
+                    ],
+                }),
+            },
+        });
+
+        expect(wrapper.find('[data-xq-table-empty]').text()).toContain('No products');
+        expect(wrapper.find('[data-xq-table-empty] [data-xq-action]').text()).toContain('Create');
+    });
+});

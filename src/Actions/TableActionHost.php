@@ -33,6 +33,8 @@ final class TableActionHost extends ActionSet
 
     public const string BULK = 'bulk';
 
+    public const string EMPTY = 'empty';
+
     private ?Table $table = null;
 
     /** @var Collection<int, Model>|null */
@@ -62,6 +64,7 @@ final class TableActionHost extends ActionSet
             self::RECORD => $this->getTable()->recordActions(),
             self::HEADER => $this->getTable()->headerActions(),
             self::BULK => $this->getTable()->bulkActions(),
+            self::EMPTY => $this->getTable()->emptyStateActions(),
             default => [],
         };
         $names = array_map(fn (Action $action): string => $action->getName(), ActionGroup::flatten($actions));

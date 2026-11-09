@@ -4,7 +4,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Xelqun\Actions\Action;
 use Xelqun\Tables\Columns\Column;
+use Xelqun\Tables\Columns\ColumnGroup;
 use Xelqun\Tables\Columns\TextColumn;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Schema\SchemaVersion;
@@ -194,4 +196,50 @@ it('sends translated text only when it differs from English', function () {
     app()->setLocale('es');
 
     expect(tableSchema()['messages'])->toBe(['No records found.' => 'Sin registros.']);
+});
+
+class ChromeTable extends ProductsTable
+{
+    public static int $created = 0;
+
+    protected function boot(): void
+    {
+        $this->heading('Products')->description('Everything in stock')->emptyState('No products', 'Add one to start.', 'package');
+    }
+
+    public function columns(): array
+    {
+        return [
+            TextColumn::make('name')->alignment('end')->width('12rem')->wrapHeader(),
+            ColumnGroup::make('Money', [TextColumn::make('price')->grow()]),
+        ];
+    }
+
+    public function emptyStateActions(): array
+    {
+        return [Action::make('create')->authorize(true)->action(fn () => self::$created++)];
+    }
+}
+
+it('sends its heading, column layout and groups, and its empty state', function () {
+    $schema = json_decode(json_encode(ChromeTable::make()->toSchema()), true);
+
+    expect($schema)->toMatchArray(['heading' => 'Products', 'description' => 'Everything in stock', 'emptyState' => ['heading' => 'No products', 'description' => 'Add one to start.', 'icon' => 'package']])
+        ->and($schema['emptyStateActions'][0]['name'])->toBe('create')
+        ->and($schema['columns'][0])->toMatchArray(['alignment' => 'end', 'width' => '12rem', 'wrapHeader' => true])
+        ->and($schema['columns'][1])->toMatchArray(['grow' => true, 'group' => 'Money'])
+        ->and(tableSchema())->not->toHaveKeys(['heading', 'emptyStateActions']);
+});
+
+it('runs an empty state action', function () {
+    ChromeTable::$created = 0;
+
+    $this->postJson(route('xelqun.tables.action'), [
+        'token' => ChromeTable::make()->makeToken(),
+        'action' => 'create',
+        'kind' => 'empty',
+        'phase' => 'run',
+    ])->assertOk();
+
+    expect(ChromeTable::$created)->toBe(1);
 });

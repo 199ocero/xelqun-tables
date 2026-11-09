@@ -20,7 +20,8 @@ export type TableStore = ReturnType<typeof createTableStore>;
 export type ActionTarget =
     | { kind: 'record'; record: string }
     | { kind: 'header' }
-    | { kind: 'bulk' };
+    | { kind: 'bulk' }
+    | { kind: 'empty' };
 
 export function createTableStore(initial: TableSchema, options: TableStoreOptions = {}) {
     const schema = shallowRef(initial);
