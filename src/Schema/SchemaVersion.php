@@ -10,5 +10,5 @@ final class SchemaVersion
      */
     public const int CURRENT = 1;
 
-    public const string PACKAGE = '0.6.1';
+    public const string PACKAGE = '0.7.0';
 }
