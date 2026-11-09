@@ -24,6 +24,12 @@ This needs `xelqun/forms` 0.9.
 - **`Table::recordAction()`** names the record action a click on the row opens.
 - **`searchable(isIndividual: true)`** gives a column a search box of its own, and **`isGlobal: false`** keeps it out of the search above the table.
 - **`counts('orders')`** and **`sum('orders', 'total')`** load related totals with the rows, and they can be sorted.
+- **`paginated(false)`** shows every row with no pager, and `'all'` can be one of the page sizes.
+- **`paginationMode('simple')`** and **`paginationMode('cursor')`** page without counting the rows. They offer previous and next, with no select all.
+- **`deferLoading()`** renders the page without rows and loads them right after.
+- **`deferFilters(false)`** applies each filter as it changes, with no Apply button.
+- **`TernaryFilter::trueLabel()`**, **`falseLabel()`**, **`placeholder()`**, **`nullable()`** and **`queries(true:, false:, blank:)`**. A filter can narrow the query while it's off through `applyWhenInactive()`.
+- **`persistSearchInSession()`**, **`persistSortInSession()`**, **`persistFiltersInSession()`** and **`persistColumnSearchesInSession()`**. A link with state of its own wins over what the session kept.
 - A chip for each active filter, which removes it. **`indicateUsing()`** on a filter says what its chip reads.
 
 ### Fixed

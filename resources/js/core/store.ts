@@ -105,7 +105,14 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
             clearSelection();
         }
 
-        return load({ ...lastQuery, ...changes });
+        const next = { ...lastQuery, ...changes };
+
+        // A cursor only makes sense for the search, sort and filters it was made for.
+        if (!('cursor' in changes)) {
+            delete next.cursor;
+        }
+
+        return load(next);
     }
 
     /**

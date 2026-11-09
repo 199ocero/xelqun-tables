@@ -185,7 +185,7 @@ function canMove(index: number, direction: 'up' | 'down'): boolean {
 
     return direction === 'up'
         ? index > 0 || page > 1
-        : index < schema.value.rows.length - 1 || page < lastPage;
+        : index < schema.value.rows.length - 1 || page < (lastPage ?? 1);
 }
 
 /**
@@ -285,6 +285,8 @@ onMounted(() => {
 
     if (!isSameQuery(schema.value.id, inUrl, schema.value.query)) {
         void store.load(inUrl);
+    } else if (schema.value.deferred) {
+        void store.load(schema.value.query);
     }
 });
 </script>
@@ -351,6 +353,7 @@ onMounted(() => {
                 :defaults="schema.filterDefaults"
                 :values="schema.query.filters"
                 :active="schema.activeFilters"
+                :live="schema.liveFilters"
                 :t="t"
                 @apply="store.update({ filters: $event, page: 1 })"
             />
@@ -393,7 +396,7 @@ onMounted(() => {
         <XqTableBulkBar
             v-if="selected.size > 0"
             :count="selected.size"
-            :total="schema.pagination.total"
+            :total="schema.pagination.total ?? null"
             :max="schema.maxSelectable"
             :t="t"
             @select-all="store.selectAll()"
@@ -645,10 +648,16 @@ onMounted(() => {
             <XqTableScrollbar :target="scroller" />
         </div>
         <XqTablePagination
-            v-if="schema.pagination.total > 0"
+            v-if="
+                !schema.pagination.hidden &&
+                (schema.pagination.mode
+                    ? schema.rows.length > 0 || schema.pagination.page > 1
+                    : (schema.pagination.total ?? 0) > 0)
+            "
             :pagination="schema.pagination"
             :t="t"
             @page="store.update({ page: $event })"
+            @cursor="store.update({ cursor: $event })"
             @per-page="store.update({ per_page: $event, page: 1 })"
         />
     </div>

@@ -3,10 +3,18 @@ import { XqButton } from '@xelqun/forms';
 import { computed } from 'vue';
 import type { TableStore } from '../core/store';
 
-const props = defineProps<{ count: number; total: number; max: number; t: TableStore['t'] }>();
+// Total is null when the pagination doesn't count the rows, and then there's no select all.
+const props = defineProps<{
+    count: number;
+    total: number | null;
+    max: number;
+    t: TableStore['t'];
+}>();
 const emit = defineEmits<{ selectAll: []; clear: [] }>();
 
-const canSelectAll = computed(() => props.count < props.total && props.total <= props.max);
+const canSelectAll = computed(
+    () => props.total !== null && props.count < props.total && props.total <= props.max,
+);
 </script>
 
 <template>
@@ -22,7 +30,7 @@ const canSelectAll = computed(() => props.count < props.total && props.total <= 
             size="sm"
             @click="emit('selectAll')"
         >
-            {{ t('Select all :count', { count: total }) }}
+            {{ t('Select all :count', { count: total ?? 0 }) }}
         </XqButton>
         <XqButton type="button" variant="ghost" size="sm" @click="emit('clear')">
             {{ t('Clear selection') }}

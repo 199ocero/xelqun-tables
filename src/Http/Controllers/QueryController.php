@@ -21,6 +21,8 @@ class QueryController
         $state = TableState::from($validated['query'], $table);
 
         if (! ($validated['keys'] ?? false)) {
+            $table->rememberState($state);
+
             return response()->json($table->toResult($state));
         }
 

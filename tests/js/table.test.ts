@@ -1550,3 +1550,60 @@ describe('records', () => {
         expect(JSON.parse(sentBody(fetchMock, last)).query.column_search).toEqual({ name: 'lam' });
     });
 });
+
+describe('pagination modes and loading', () => {
+    it('pages by cursor and leaves the counts out', async () => {
+        const table = schema({
+            pagination: {
+                page: 1,
+                perPage: 2,
+                options: [2],
+                mode: 'cursor',
+                next: 'abc',
+                previous: null,
+            },
+        });
+        const fetchMock = respondWith({ ...table });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table } });
+
+        expect(wrapper.text()).not.toContain('Showing');
+        expect(wrapper.find('[aria-label="Previous page"]').attributes('disabled')).toBeDefined();
+
+        await wrapper.find('[aria-label="Next page"]').trigger('click');
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock)).query.cursor).toBe('abc');
+    });
+
+    it('hides the pager when the table is not paginated', () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    pagination: {
+                        page: 1,
+                        perPage: 'all',
+                        total: 1,
+                        lastPage: 1,
+                        options: ['all'],
+                        hidden: true,
+                    },
+                }),
+            },
+        });
+
+        expect(wrapper.find('[aria-label="Next page"]').exists()).toBe(false);
+    });
+
+    it('loads its rows after mounting when loading is deferred', async () => {
+        const fetchMock = respondWith({ ...schema() });
+
+        vi.stubGlobal('fetch', fetchMock);
+        mount(XqTable, { props: { table: schema({ rows: [], deferred: true }) } });
+        await flushPromises();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});

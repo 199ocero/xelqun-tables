@@ -22,6 +22,8 @@ final class TableState
      * @param  string|null  $sort  A sortable column's name, with a leading "-" for descending.
      * @param  array<string, mixed>  $filters  Every filter field's value.
      * @param  array<string, string>  $columnSearches  A search of its own for each column that has a box.
+     * @param  int  $perPage  0 for every row on one page.
+     * @param  string|null  $cursor  Where a cursor-paginated table is, as Laravel encodes it.
      */
     public function __construct(
         public readonly int $page,
@@ -30,6 +32,7 @@ final class TableState
         public readonly ?string $sort = null,
         public readonly array $filters = [],
         public readonly array $columnSearches = [],
+        public readonly ?string $cursor = null,
     ) {}
 
     /**
@@ -37,8 +40,9 @@ final class TableState
      */
     public static function from(array $input, Table $table): self
     {
-        $options = $table->getPaginationPageOptions();
-        $perPage = filter_var($input['per_page'] ?? null, FILTER_VALIDATE_INT);
+        $options = array_map(fn (int|string $option): int => $option === 'all' ? 0 : $option, $table->getPaginationPageOptions());
+        $perPage = ($input['per_page'] ?? null) === 'all' ? 0 : filter_var($input['per_page'] ?? null, FILTER_VALIDATE_INT);
+        $cursor = $input['cursor'] ?? null;
         $search = $input['search'] ?? null;
         $sort = $input['sort'] ?? null;
 
@@ -51,6 +55,7 @@ final class TableState
                 : $table->getDefaultSort(),
             filters: self::readFilters($input['filters'] ?? [], $table),
             columnSearches: self::readColumnSearches($input['column_search'] ?? [], $table),
+            cursor: is_string($cursor) && strlen($cursor) <= 1000 ? $cursor : null,
         );
     }
 
@@ -128,7 +133,7 @@ final class TableState
 
     public function withPage(int $page): self
     {
-        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters, $this->columnSearches);
+        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters, $this->columnSearches, $this->cursor);
     }
 
     /**
@@ -152,7 +157,8 @@ final class TableState
             'filters' => $filters === [] ? null : $filters,
             'column_search' => $this->columnSearches === [] ? null : $this->columnSearches,
             'page' => $this->page > 1 ? $this->page : null,
-            'per_page' => $this->perPage === $table->getPaginationPageOptions()[0] ? null : $this->perPage,
+            'cursor' => $this->cursor,
+            'per_page' => $this->perPage === ($table->getPaginationPageOptions()[0] === 'all' ? 0 : $table->getPaginationPageOptions()[0]) ? null : ($this->perPage === 0 ? 'all' : $this->perPage),
         ], fn (mixed $value): bool => $value !== null);
     }
 

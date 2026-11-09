@@ -51,10 +51,19 @@ export interface TableRow {
 
 export interface TablePagination {
     page: number;
-    perPage: number;
-    total: number;
-    lastPage: number;
-    options: number[];
+    perPage: number | 'all';
+    /** Left out by simple and cursor pagination, which don't count. */
+    total?: number;
+    lastPage?: number;
+    options: Array<number | 'all'>;
+    mode?: 'simple' | 'cursor';
+    /** Simple pagination: whether there's a next page. */
+    hasMore?: boolean;
+    /** Cursor pagination: where the next and previous pages start. */
+    next?: string | null;
+    previous?: string | null;
+    /** paginated(false): every row, with no pager. */
+    hidden?: boolean;
 }
 
 /**
@@ -96,6 +105,10 @@ export interface TableSchema extends TableResult {
     searchable: boolean;
     filters: FormSchema | null;
     filterDefaults: Record<string, unknown>;
+    /** Filters apply as they change, with no Apply button. */
+    liveFilters?: boolean;
+    /** The rows load after the first render. */
+    deferred?: boolean;
     messages?: Record<string, string>;
     columns: TableColumn[];
 }

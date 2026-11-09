@@ -57,6 +57,17 @@ abstract class Table
 
     private int $maxSelectableRecords = 1000;
 
+    private bool $isPaginated = true;
+
+    private string $paginationMode = 'default';
+
+    private bool $isLoadingDeferred = false;
+
+    private bool $hasDeferredFilters = true;
+
+    /** @var array<int, string> The parts of the state the session keeps: search, sort, filters, column_search. */
+    private array $persistedInSession = [];
+
     /** @var array{heading: string, description: string|null}|null */
     private ?array $emptyState = null;
 
@@ -294,12 +305,20 @@ abstract class Table
     }
 
     /**
-     * @param  array<int, int>  $options
+     * The page sizes the viewer picks from. 'all' puts every row on one page.
+     *
+     * @param  array<int, int|string>  $options
      */
     public function paginationPageOptions(array $options): static
     {
-        if ($options === [] || min($options) < 1) {
-            throw new TableDefinitionException('The table ['.static::class.'] needs at least one page size, and none below 1.');
+        foreach ($options as $option) {
+            if ($option !== 'all' && (! is_int($option) || $option < 1)) {
+                throw new TableDefinitionException('The table ['.static::class.'] needs at least one page size, and each a number from 1 up, or \'all\'.');
+            }
+        }
+
+        if ($options === []) {
+            throw new TableDefinitionException('The table ['.static::class.'] needs at least one page size, and each a number from 1 up, or \'all\'.');
         }
 
         $this->paginationPageOptions = array_values($options);
@@ -308,7 +327,109 @@ abstract class Table
     }
 
     /**
-     * @return array<int, int>
+     * false shows every row with no pager. An array sets the page sizes, like
+     * paginationPageOptions().
+     *
+     * @param  bool|array<int, int|string>  $condition
+     */
+    public function paginated(bool|array $condition = true): static
+    {
+        if (is_array($condition)) {
+            return $this->paginationPageOptions($condition);
+        }
+
+        $this->isPaginated = $condition;
+
+        return $condition ? $this : $this->paginationPageOptions(['all']);
+    }
+
+    /**
+     * default counts the rows for page numbers. simple skips the count and
+     * offers only previous and next, and cursor does too, from where the last
+     * page ended, which stays fast deep into a big table.
+     */
+    public function paginationMode(string $mode): static
+    {
+        if (! in_array($mode, ['default', 'simple', 'cursor'], true)) {
+            throw new TableDefinitionException('The table ['.static::class."] has no pagination mode [{$mode}]. Use default, simple or cursor.");
+        }
+
+        $this->paginationMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Render the page without rows, and load them right after. For a slow query
+     * on a page that shows more than the table.
+     */
+    public function deferLoading(bool $condition = true): static
+    {
+        $this->isLoadingDeferred = $condition;
+
+        return $this;
+    }
+
+    /**
+     * false applies each filter as it changes, with no Apply button.
+     */
+    public function deferFilters(bool $condition = true): static
+    {
+        $this->hasDeferredFilters = $condition;
+
+        return $this;
+    }
+
+    public function persistSearchInSession(bool $condition = true): static
+    {
+        return $this->persistInSession('search', $condition);
+    }
+
+    public function persistSortInSession(bool $condition = true): static
+    {
+        return $this->persistInSession('sort', $condition);
+    }
+
+    public function persistFiltersInSession(bool $condition = true): static
+    {
+        return $this->persistInSession('filters', $condition);
+    }
+
+    public function persistColumnSearchesInSession(bool $condition = true): static
+    {
+        return $this->persistInSession('column_search', $condition);
+    }
+
+    private function persistInSession(string $part, bool $condition): static
+    {
+        $this->persistedInSession = array_values(array_diff($this->persistedInSession, [$part]));
+
+        if ($condition) {
+            $this->persistedInSession[] = $part;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Keep the parts of the state this table persists, for the next visit.
+     *
+     * @internal
+     */
+    public function rememberState(TableState $state): void
+    {
+        if ($this->persistedInSession !== []) {
+            session()->put($this->getSessionKey(), Arr::only($state->toQuery($this), $this->persistedInSession));
+        }
+    }
+
+    private function getSessionKey(): string
+    {
+        return 'xelqun-tables.'.static::class.'.'.$this->getId().'.'.md5((string) json_encode($this->context));
+    }
+
+    /**
+     * @return array<int, int|string>
      */
     public function getPaginationPageOptions(): array
     {
@@ -561,7 +682,10 @@ abstract class Table
         abort_unless($this->authorize(auth()->user()), 403);
 
         $input = request()->query($this->getId());
-        $result = $this->toResult(TableState::from(is_array($input) ? $input : [], $this));
+        // A link or a refresh with state of its own wins over what the session kept.
+        $input = is_array($input) && $input !== [] ? $input : ($this->persistedInSession === [] ? [] : (array) session($this->getSessionKey(), []));
+        $state = TableState::from($input, $this);
+        $result = $this->isLoadingDeferred ? $this->toDeferredResult($state) : $this->toResult($state);
 
         return [
             '$xq' => SchemaVersion::CURRENT,
@@ -585,6 +709,8 @@ abstract class Table
             ...($this->emptyStateActions() === [] ? [] : ['emptyStateActions' => TableActionHost::for($this, TableActionHost::EMPTY)->toActionNodes()]),
             'filters' => $this->getFilters() === [] ? null : $this->getFiltersForm()->toSchema(),
             'filterDefaults' => (object) $this->getFilterDefaults(),
+            ...($this->hasDeferredFilters ? [] : ['liveFilters' => true]),
+            ...($this->isLoadingDeferred ? ['deferred' => true] : []),
             ...$result,
         ];
     }
@@ -601,11 +727,7 @@ abstract class Table
         $columns = $this->getColumns();
         $hasRecordActions = $this->recordActions() !== [];
         $query = $this->buildQuery($state);
-        $total = $query->toBase()->getCountForPagination();
-
-        // Counted first, because deleting the last row of the last page leaves the viewer past the end.
-        $state = $state->withPage(min($state->page, max((int) ceil($total / $state->perPage), 1)));
-        $records = $query->paginate($state->perPage, page: $state->page, total: $total);
+        [$records, $state, $pagination] = $this->paginate($query, $state);
 
         return [
             'query' => (object) $state->toQuery($this),
@@ -615,7 +737,7 @@ abstract class Table
             // Here and not in the first render, so a filter can change which bulk actions make sense.
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
             'summaries' => $this->getSummaries($state),
-            'rows' => $records->getCollection()->map(fn (Model $record): array => [
+            'rows' => $records->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
                 ...array_filter([
                     'url' => SafeUrl::filter($this->recordUrl($record)),
@@ -628,13 +750,66 @@ abstract class Table
                     ->all(),
                 'actions' => $hasRecordActions ? TableActionHost::for($this, TableActionHost::RECORD, $record)->toActionNodes() : [],
             ])->all(),
-            'pagination' => [
-                'page' => $records->currentPage(),
-                'perPage' => $records->perPage(),
-                'total' => $records->total(),
-                'lastPage' => $records->lastPage(),
-                'options' => $this->paginationPageOptions,
-            ],
+            'pagination' => $pagination,
+        ];
+    }
+
+    /**
+     * The rows of this page, the state with the page it really is, and what
+     * the pager shows.
+     *
+     * @param  Builder<covariant Model>  $query
+     * @return array{0: Collection<int, Model>, 1: TableState, 2: array<string, mixed>}
+     */
+    private function paginate(Builder $query, TableState $state): array
+    {
+        $shared = [
+            'perPage' => $state->perPage === 0 ? 'all' : $state->perPage,
+            'options' => $this->paginationPageOptions,
+            ...($this->isPaginated ? [] : ['hidden' => true]),
+        ];
+
+        if ($this->paginationMode === 'cursor' && $state->perPage > 0) {
+            // A cursor needs a unique order, so the key breaks ties.
+            // shortcut: Laravel's cursor reads plain columns, so a sort through a relation or on counts()/sum() fails here; use default pagination for those tables, or teach the cursor the expression if one needs it.
+            $records = $query->orderBy($query->getModel()->getQualifiedKeyName())->cursorPaginate($state->perPage, cursor: $state->cursor);
+
+            return [$records->getCollection(), $state, [...$shared, 'mode' => 'cursor', 'page' => 1, 'next' => $records->nextCursor()?->encode(), 'previous' => $records->previousCursor()?->encode()]];
+        }
+
+        if ($this->paginationMode === 'simple' && $state->perPage > 0) {
+            $records = $query->simplePaginate($state->perPage, page: $state->page);
+
+            return [$records->getCollection(), $state, [...$shared, 'mode' => 'simple', 'page' => $records->currentPage(), 'hasMore' => $records->hasMorePages()]];
+        }
+
+        $total = $query->toBase()->getCountForPagination();
+        $perPage = $state->perPage === 0 ? max($total, 1) : $state->perPage;
+
+        // Counted first, because deleting the last row of the last page leaves the viewer past the end.
+        $state = $state->withPage(min($state->page, max((int) ceil($total / $perPage), 1)));
+        $records = $query->paginate($perPage, page: $state->page, total: $total);
+
+        return [$records->getCollection(), $state, ['page' => $records->currentPage(), 'perPage' => $shared['perPage'], 'total' => $total, 'lastPage' => $records->lastPage(), ...$shared]];
+    }
+
+    /**
+     * What the first render sends when the rows load afterwards: the state,
+     * with nothing that needs the query.
+     *
+     * @return array<string, mixed>
+     */
+    private function toDeferredResult(TableState $state): array
+    {
+        return [
+            'query' => (object) $state->toQuery($this),
+            'sort' => $state->sort,
+            'activeFilters' => count($this->getActiveFilters($state)),
+            'indicators' => [],
+            'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
+            'summaries' => [],
+            'rows' => [],
+            'pagination' => ['page' => $state->page, 'perPage' => $state->perPage === 0 ? 'all' : $state->perPage, 'total' => 0, 'lastPage' => 1, 'options' => $this->paginationPageOptions],
         ];
     }
 
@@ -765,6 +940,15 @@ abstract class Table
         }
 
         $activeFilters = $this->getActiveFilters($state);
+
+        // A global scope, like the others, so an orWhere in query() can't get around it.
+        $query->withGlobalScope('xelqun-inactive-filters', function (Builder $scoped) use ($activeFilters): void {
+            foreach ($this->getFilters() as $filter) {
+                if (! in_array($filter, $activeFilters, true)) {
+                    $scoped->where(fn (Builder $group) => $filter->applyWhenInactive($group));
+                }
+            }
+        });
 
         if ($activeFilters !== []) {
             // One group for each, so an orWhere in a filter's closure stays inside that filter.

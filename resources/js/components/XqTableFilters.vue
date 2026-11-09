@@ -2,7 +2,7 @@
 import { useXqForm, XqBadge, XqButton, XqForm, XqPopover } from '@xelqun/forms';
 import type { FormSchema, FormStore } from '@xelqun/forms';
 import { ListFilter } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { onScopeDispose, ref, watch } from 'vue';
 import type { TableStore } from '../core/store';
 
 const props = defineProps<{
@@ -11,6 +11,8 @@ const props = defineProps<{
     /** The values the rows were loaded with. Only those that differ from a default. */
     values?: Record<string, unknown>;
     active: number;
+    /** Apply each change as it happens, with no Apply button. */
+    live?: boolean;
     t: TableStore['t'];
 }>();
 const emit = defineEmits<{ apply: [filters: Record<string, unknown>] }>();
@@ -39,6 +41,26 @@ watch(
     },
 );
 
+let liveTimer: ReturnType<typeof setTimeout> | undefined;
+
+// A pause after the last change, so typing a number doesn't load the rows for every digit.
+watch(
+    () => JSON.stringify(store.state.data),
+    () => {
+        if (!props.live || !open.value) {
+            return;
+        }
+
+        clearTimeout(liveTimer);
+        liveTimer = setTimeout(async () => {
+            await store.settled();
+            emit('apply', { ...store.state.data });
+        }, 300);
+    },
+);
+
+onScopeDispose(() => clearTimeout(liveTimer));
+
 function reset(): void {
     Object.entries(props.defaults).forEach(([name, value]) => store.set(`data.${name}`, value));
     void apply(store);
@@ -65,7 +87,7 @@ function reset(): void {
                     <XqButton type="button" variant="ghost" size="sm" @click="reset">
                         {{ t('Reset') }}
                     </XqButton>
-                    <XqButton type="submit" size="sm">{{ t('Apply') }}</XqButton>
+                    <XqButton v-if="!live" type="submit" size="sm">{{ t('Apply') }}</XqButton>
                 </div>
             </template>
         </XqForm>

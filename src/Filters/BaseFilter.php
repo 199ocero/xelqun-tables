@@ -59,6 +59,13 @@ abstract class BaseFilter
      */
     abstract public function apply(Builder $query, array $data): void;
 
+    /**
+     * Narrow the query while the filter is off. Most filters leave it alone.
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    public function applyWhenInactive(Builder $query): void {}
+
     public function label(string|Closure|null $label): static
     {
         $this->label = $label;
