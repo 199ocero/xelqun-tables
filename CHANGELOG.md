@@ -2,6 +2,20 @@
 
 Xelqun Tables is alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+This needs `xelqun/forms` 0.9.
+
+### Added
+
+- **`TextColumn::description()`** puts smaller text under the value, or above it, and **`placeholder()`** fills an empty cell.
+- **`Column::default()`** stands in for an empty value, and **`Column::tooltip()`** shows text on hover.
+- **`TextColumn::limit()`** and **`words()`** cut long text and show the whole of it on hover. **`lineClamp()`** wraps the text to at most that many lines.
+- **`TextColumn::copyable()`**, with `copyMessage()` and `copyMessageDuration()`.
+- **`TextColumn::numeric()`**, **`time()`**, **`since()`** and **`timezone()`**. `date()` and `dateTime()` take a time zone too.
+- **`TextColumn::listWithLineBreaks()`**, **`bulleted()`**, **`limitList()`** and **`expandableLimitedList()`** for a cell that holds a list.
+- An action that calls `$action->halt()` keeps its modal open, and a bulk action keeps its selection.
+
 ## 0.6.1 - 2026-11-08
 
 The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.6.1`. With `xelqun/panels`, this is what hides restore and force delete from a selection while deleted rows are hidden.

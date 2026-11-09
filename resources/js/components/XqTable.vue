@@ -11,9 +11,10 @@ import {
 } from '@xelqun/forms';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from '@lucide/vue';
 import type { HTMLAttributes } from 'vue';
-import { computed, onMounted, onScopeDispose, ref, watch } from 'vue';
+import { computed, onMounted, onScopeDispose, provide, ref, watch } from 'vue';
 import { useRowGlide } from '../composables/useRowGlide';
 import { createTableStore } from '../core/store';
+import { TABLE_TRANSLATOR } from '../core/translator';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
 import type { TableQuery, TableSchema } from '../schema/types';
@@ -32,6 +33,8 @@ const props = defineProps<{ table: TableSchema; class?: HTMLAttributes['class'] 
 const registry = useRegistry();
 const store = createTableStore(props.table, { onChange: syncUrl });
 const { schema, loading, error, canRetry, selected, t } = store;
+
+provide(TABLE_TRANSLATOR, t);
 const isSupported = computed(() =>
     (SUPPORTED_SCHEMA_VERSIONS as readonly number[]).includes(schema.value.$xq),
 );

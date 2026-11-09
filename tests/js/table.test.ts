@@ -1300,3 +1300,67 @@ describe('sorting cards', () => {
         expect(wrapper.find('#xq-products-table-sort').exists()).toBe(true);
     });
 });
+
+describe('text cells', () => {
+    function render(props: Record<string, unknown>, cell: Record<string, unknown>) {
+        return mount(XqTable, {
+            props: {
+                table: schema({
+                    columns: [
+                        {
+                            name: 'name',
+                            type: 'text-column',
+                            label: 'Name',
+                            sortable: false,
+                            props,
+                        },
+                    ],
+                    rows: [{ key: '1', cells: { name: cell as any }, actions: [] }],
+                }),
+            },
+        });
+    }
+
+    it('shows a placeholder, a description and a tooltip', () => {
+        const empty = render({ placeholder: 'None' }, { state: null });
+
+        expect(empty.find('[data-xq-cell-placeholder]').text()).toBe('None');
+
+        const described = render({}, { state: 'Lamp', description: 'In stock', tooltip: 'Full' });
+
+        expect(described.find('[data-xq-cell-description]').text()).toBe('In stock');
+        expect(described.find('[data-xq-table-row] td').attributes('title')).toBe('Full');
+    });
+
+    it('shows the first values of a list and opens the rest when it may', async () => {
+        const wrapper = render(
+            { bulleted: true, limitList: 2, expandableLimitedList: true },
+            { state: ['A', 'B', 'C'] },
+        );
+
+        expect(wrapper.findAll('li').map((item) => item.text())).toEqual(['A', 'B']);
+        expect(wrapper.find('[data-xq-cell-more]').text()).toBe('and 1 more');
+
+        await wrapper.find('[data-xq-cell-more]').trigger('click');
+
+        expect(wrapper.findAll('li')).toHaveLength(3);
+
+        const fixed = render({ listWithLineBreaks: true, limitList: 1 }, { state: ['A', 'B'] });
+
+        expect(fixed.find('[data-xq-cell-more]').element.tagName).toBe('SPAN');
+    });
+
+    it('copies its value', async () => {
+        const writeText = vi.fn(() => Promise.resolve());
+
+        vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+        const wrapper = render({ copyable: true, copyMessage: 'Done' }, { state: 'SKU-1' });
+
+        await wrapper.find('[data-xq-cell-copy]').trigger('click');
+        await flushPromises();
+
+        expect(writeText).toHaveBeenCalledWith('SKU-1');
+        expect(wrapper.find('[role="status"]').text()).toBe('Done');
+    });
+});

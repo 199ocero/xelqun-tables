@@ -47,6 +47,10 @@ abstract class Column
 
     protected string|Closure|null $url = null;
 
+    protected mixed $default = null;
+
+    protected string|Closure|null $tooltip = null;
+
     protected bool $opensUrlInNewTab = false;
 
     protected bool $isSortable = false;
@@ -137,6 +141,26 @@ abstract class Column
     protected function getCellProps(Model $record, mixed $state): array
     {
         return [];
+    }
+
+    /**
+     * What the cell holds when the record has nothing there. A closure gets $record.
+     */
+    public function default(mixed $value): static
+    {
+        $this->default = $value;
+
+        return $this;
+    }
+
+    /**
+     * Text shown on hover. A closure gets $record and $state.
+     */
+    public function tooltip(string|Closure|null $tooltip): static
+    {
+        $this->tooltip = $tooltip;
+
+        return $this;
     }
 
     public function label(string|Closure|null $label): static
@@ -360,18 +384,18 @@ abstract class Column
     public function getState(Model $record): mixed
     {
         if ($this->stateUsing !== null) {
-            return $this->evaluate($this->stateUsing, ['record' => $record]);
+            $state = $this->evaluate($this->stateUsing, ['record' => $record]);
+        } else {
+            $state = $record;
+
+            foreach (explode('.', $this->name) as $segment) {
+                $state = $state instanceof Collection
+                    ? $state->map(fn (mixed $item): mixed => data_get($item, $segment))->flatten(1)
+                    : data_get($state, $segment);
+            }
         }
 
-        $state = $record;
-
-        foreach (explode('.', $this->name) as $segment) {
-            $state = $state instanceof Collection
-                ? $state->map(fn (mixed $item): mixed => data_get($item, $segment))->flatten(1)
-                : data_get($state, $segment);
-        }
-
-        return $state;
+        return $state ?? $this->evaluate($this->default, ['record' => $record]);
     }
 
     /**
@@ -559,6 +583,7 @@ abstract class Column
                 'color' => $state === null ? null : $this->evaluateForCell($this->color, $record, $state) ?? $this->fromEnum($state, 'getColor'),
                 'icon' => $state === null ? null : $this->evaluateForCell($this->icon, $record, $state) ?? $this->fromEnum($state, 'getIcon'),
                 'url' => SafeUrl::filter($this->evaluateForCell($this->url, $record, $state)),
+                'tooltip' => $this->evaluateForCell($this->tooltip, $record, $state),
                 ...$this->getCellProps($record, $state),
             ], fn (mixed $value): bool => $value !== null),
         ];

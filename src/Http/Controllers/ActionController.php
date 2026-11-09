@@ -53,6 +53,7 @@ class ActionController
         return response()->json([
             'result' => $action->hasResult() ? $result : null,
             'redirect' => $action->getSuccessRedirectUrl(),
+            ...($action->keepsModalOpen() ? ['halted' => true] : []),
             ...($sentNotifications === [] ? [] : ['notifications' => $sentNotifications]),
         ]);
     }

@@ -54,7 +54,41 @@ it('keeps the shape of every column', function (Column $column) {
     'boolean' => fn () => IconColumn::make('name')->boolean(),
     'image' => fn () => ImageColumn::make('secret')->size(32)->circular()->alt('Photo'),
     'custom' => fn () => CustomColumn::make('name')->component('acme/thing')->props(['a' => 1]),
+    'text with every option' => fn () => TextColumn::make('name')->description('About', 'above')->placeholder('None')->lineClamp(2)
+        ->copyable()->copyMessage('Done')->copyMessageDuration(500)->bulleted()->listWithLineBreaks()->limitList(3)->expandableLimitedList()->tooltip('Hover'),
 ]);
+
+it('fills an empty cell with its default, and shows a placeholder for one with none', function () {
+    $product = Product::create(['name' => 'Keyboard', 'price' => 1]);
+
+    expect(cellOf(TextColumn::make('secret')->default(fn ($record) => 'no '.$record->name), $product)['state'])->toBe('no Keyboard');
+});
+
+it('cuts long text and shows the whole of it on hover', function () {
+    $product = Product::create(['name' => 'A long keyboard name', 'price' => 1]);
+
+    expect(cellOf(TextColumn::make('name')->limit(6), $product))->toMatchArray(['state' => 'A long...', 'tooltip' => 'A long keyboard name'])
+        ->and(cellOf(TextColumn::make('name')->words(2, '…'), $product))->toMatchArray(['state' => 'A long…', 'tooltip' => 'A long keyboard name'])
+        ->and(cellOf(TextColumn::make('name')->limit(6)->tooltip('Mine'), $product)['tooltip'])->toBe('Mine')
+        ->and(cellOf(TextColumn::make('name')->limit(60), $product))->not->toHaveKey('tooltip');
+});
+
+it('gives each cell its description', function () {
+    expect(cellOf(TextColumn::make('name')->description(fn (Product $record, string $state): string => "{$state} #{$record->price}"))['description'])->toBe('Keyboard #1234.5');
+});
+
+it('formats numbers, times and how long ago, in a time zone', function () {
+    $product = Product::create(['name' => 'Keyboard', 'price' => 1234.5, 'created_at' => now()->subDays(3)]);
+    $product->created_at = '2026-01-15 23:30:00';
+
+    expect(cellOf(TextColumn::make('price')->numeric(2, 'en'), $product)['state'])->toBe('1,234.50')
+        ->and(cellOf(TextColumn::make('created_at')->time('H:i')->timezone('Asia/Manila'), $product)['state'])->toBe('07:30')
+        ->and(cellOf(TextColumn::make('created_at')->dateTime('M j H:i', 'Asia/Manila'), $product)['state'])->toBe('Jan 16 07:30');
+
+    $product->created_at = now()->subDays(3);
+
+    expect(cellOf(TextColumn::make('created_at')->since(), $product)['state'])->toBe('3 days ago');
+});
 
 it('formats money in the given currency', function () {
     expect(cellOf(TextColumn::make('price')->money('EUR', 'de'))['state'])->toBe("1.234,50\u{a0}€");

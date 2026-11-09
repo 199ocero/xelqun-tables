@@ -1,0 +1,30 @@
+{
+    "column": [
+        {
+            "name": "name",
+            "type": "text-column",
+            "label": "Name",
+            "sortable": false,
+            "props": {
+                "wrap": true,
+                "descriptionAbove": true,
+                "placeholder": "None",
+                "lineClamp": 2,
+                "copyable": true,
+                "copyMessage": "Done",
+                "copyMessageDuration": 500,
+                "listWithLineBreaks": true,
+                "bulleted": true,
+                "limitList": 3,
+                "expandableLimitedList": true
+            }
+        }
+    ],
+    "cell": {
+        "name": {
+            "state": "Keyboard",
+            "tooltip": "Hover",
+            "description": "About"
+        }
+    }
+}

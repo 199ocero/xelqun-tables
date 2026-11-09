@@ -275,7 +275,8 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
 
                     response.notifications?.forEach(notify);
 
-                    if (target.kind === 'bulk') {
+                    // A halted action keeps its modal open, so the selection it works on stays too.
+                    if (target.kind === 'bulk' && !response.halted) {
                         clearSelection();
                     }
 
