@@ -147,6 +147,20 @@ const columnGroups = computed(() => {
     return runs;
 });
 
+const hasColumnSearch = computed(() =>
+    columns.value.some((column) => column.searchableIndividually),
+);
+
+function searchColumn(name: string, search: string): void {
+    const searches = { ...schema.value.query.column_search, [name]: search };
+
+    if (search === '') {
+        delete searches[name];
+    }
+
+    store.update({ column_search: searches, page: 1 });
+}
+
 function removeIndicator(fields: string[]): void {
     const filters = { ...schema.value.query.filters };
 
@@ -549,6 +563,20 @@ onMounted(() => {
                             <th v-if="hasRowActions" scope="col">
                                 <span class="sr-only">{{ t('Actions') }}</span>
                             </th>
+                        </tr>
+                        <tr v-if="hasColumnSearch" data-xq-table-column-search>
+                            <td v-if="schema.layout.reorderable"></td>
+                            <td v-if="hasSelection"></td>
+                            <td v-for="column in columns" :key="column.name" class="px-3 pb-2">
+                                <XqTableSearch
+                                    v-if="column.searchableIndividually"
+                                    :value="schema.query.column_search?.[column.name] ?? ''"
+                                    :t="t"
+                                    :label="t('Search :column', { column: column.label })"
+                                    @search="searchColumn(column.name, $event)"
+                                />
+                            </td>
+                            <td v-if="hasRowActions"></td>
                         </tr>
                     </thead>
                     <tbody>

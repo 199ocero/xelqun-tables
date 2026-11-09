@@ -19,6 +19,11 @@ This needs `xelqun/forms` 0.9.
 - **`ColumnGroup::make('Money', [...])`** puts a heading over neighbouring columns.
 - **`Table::heading()`** and **`description()`** go above the table.
 - **`emptyState()`** takes an icon, and **`Table::emptyStateActions()`** puts buttons in it, such as one that creates the first record.
+- **`checkIfRecordIsSelectableUsing()`** decides which rows can be selected. The server checks it too, so a row it refuses never reaches a bulk action or select all.
+- **`BulkAction::authorizeIndividualRecords('archive')`** runs the action on the selected records the policy allows, instead of refusing them all.
+- **`Table::recordAction()`** names the record action a click on the row opens.
+- **`searchable(isIndividual: true)`** gives a column a search box of its own, and **`isGlobal: false`** keeps it out of the search above the table.
+- **`counts('orders')`** and **`sum('orders', 'total')`** load related totals with the rows, and they can be sorted.
 - A chip for each active filter, which removes it. **`indicateUsing()`** on a filter says what its chip reads.
 
 ### Fixed

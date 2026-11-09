@@ -62,6 +62,8 @@ abstract class Table
 
     private ?string $heading = null;
 
+    private ?Closure $isRecordSelectable = null;
+
     private ?string $description = null;
 
     /** @var array<int, Column>|null */
@@ -245,6 +247,15 @@ abstract class Table
             fn (mixed $key): bool => is_scalar($key) && ($model->getKeyType() !== 'int' || ctype_digit((string) $key)),
         )));
 
+        if ($this->isRecordSelectable !== null) {
+            // Checked one at a time, because the rule is PHP and not SQL.
+            $keys = $this->query()->whereKey($keys)->cursor()
+                ->filter(fn (Model $record): bool => $this->isRecordSelectable($record))
+                ->map(fn (Model $record): mixed => $record->getKey())
+                ->values()
+                ->all();
+        }
+
         return $query->withGlobalScope('xelqun-records', fn (Builder $scoped): Builder => $scoped->whereKey($keys));
     }
 
@@ -259,7 +270,10 @@ abstract class Table
     public function getSelectableKeys(TableState $state): ?array
     {
         $query = $this->buildQuery($state);
-        $keys = $query->limit($this->maxSelectableRecords + 1)->pluck($query->getModel()->getQualifiedKeyName());
+        // shortcut: with a selectable rule, select all checks rows one at a time in PHP until it has enough; give the rule a query scope if tables with many unselectable rows get slow.
+        $keys = $this->isRecordSelectable === null
+            ? $query->limit($this->maxSelectableRecords + 1)->pluck($query->getModel()->getQualifiedKeyName())
+            : $query->cursor()->filter(fn (Model $record): bool => $this->isRecordSelectable($record))->take($this->maxSelectableRecords + 1)->map(fn (Model $record): mixed => $record->getKey())->collect();
 
         return $keys->count() > $this->maxSelectableRecords ? null : $keys->map(strval(...))->all();
     }
@@ -319,7 +333,7 @@ abstract class Table
 
     public function isSearchable(): bool
     {
-        return collect($this->getColumns())->contains(fn (Column $column): bool => $column->isSearchable());
+        return collect($this->getColumns())->contains(fn (Column $column): bool => $column->isGloballySearchable());
     }
 
     /**
@@ -479,6 +493,30 @@ abstract class Table
     }
 
     /**
+     * The record action clicking a row opens, by name. A link wins over this.
+     */
+    public function recordAction(Model $record): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Which rows can be selected for bulk actions. It gets $record. The server
+     * checks it too, so a row it refuses never reaches a bulk action.
+     */
+    public function checkIfRecordIsSelectableUsing(?Closure $callback): static
+    {
+        $this->isRecordSelectable = $callback;
+
+        return $this;
+    }
+
+    public function isRecordSelectable(Model $record): bool
+    {
+        return $this->isRecordSelectable === null || (bool) app()->call($this->isRecordSelectable, ['record' => $record]);
+    }
+
+    /**
      * The columns the viewer may see. A hidden one is left out of everything,
      * search and sorting included, so a viewer can't work out its values.
      *
@@ -579,7 +617,12 @@ abstract class Table
             'summaries' => $this->getSummaries($state),
             'rows' => $records->getCollection()->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
-                ...array_filter(['url' => SafeUrl::filter($this->recordUrl($record)), 'group' => $this->getRowGroup($record)]),
+                ...array_filter([
+                    'url' => SafeUrl::filter($this->recordUrl($record)),
+                    'group' => $this->getRowGroup($record),
+                    'action' => $hasRecordActions ? $this->recordAction($record) : null,
+                ]),
+                ...($this->isRecordSelectable($record) ? [] : ['selectable' => false]),
                 'cells' => collect($columns)
                     ->mapWithKeys(fn (Column $column): array => [$column->getName() => $column->toCell($record)])
                     ->all(),
@@ -700,11 +743,25 @@ abstract class Table
             // A global scope, because a where added here would escape an orWhere in query().
             $query->withGlobalScope('xelqun-search', fn (Builder $scoped): Builder => $scoped->where(function (Builder $group) use ($state): void {
                 foreach ($this->getColumns() as $column) {
-                    if ($column->isSearchable()) {
+                    if ($column->isGloballySearchable()) {
                         $column->applySearch($group, $state->search);
                     }
                 }
             }));
+        }
+
+        if ($state->columnSearches !== []) {
+            $query->withGlobalScope('xelqun-column-search', function (Builder $scoped) use ($state): void {
+                foreach ($this->getColumns() as $column) {
+                    if (isset($state->columnSearches[$column->getName()])) {
+                        $scoped->where(fn (Builder $group) => $column->applySearch($group, $state->columnSearches[$column->getName()]));
+                    }
+                }
+            });
+        }
+
+        foreach ($this->getColumns() as $column) {
+            $column->applyAggregate($query);
         }
 
         $activeFilters = $this->getActiveFilters($state);

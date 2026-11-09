@@ -71,6 +71,13 @@ abstract class Column
 
     protected ?Closure $searchUsing = null;
 
+    protected bool $isIndividuallySearchable = false;
+
+    protected bool $isGloballySearchable = true;
+
+    /** @var array{0: string, 1: string, 2: string|null}|null A function, a relation and its column. */
+    protected ?array $aggregate = null;
+
     /** @var array<int, Summarizer> */
     protected array $summarizers = [];
 
@@ -316,12 +323,68 @@ abstract class Column
      * needs a closure, which receives $query and $search and should add
      * orWhere conditions.
      */
-    public function searchable(bool $condition = true, ?Closure $query = null): static
+    public function searchable(bool $condition = true, ?Closure $query = null, bool $isIndividual = false, bool $isGlobal = true): static
     {
         $this->isSearchable = $condition;
         $this->searchUsing = $query;
+        $this->isIndividuallySearchable = $condition && $isIndividual;
+        $this->isGloballySearchable = $isGlobal;
 
         return $this;
+    }
+
+    /**
+     * A search box of its own, under the heading.
+     */
+    public function isIndividuallySearchable(): bool
+    {
+        return $this->isIndividuallySearchable;
+    }
+
+    /**
+     * Part of the search box above the table.
+     */
+    public function isGloballySearchable(): bool
+    {
+        return $this->isSearchable && $this->isGloballySearchable;
+    }
+
+    /**
+     * How many related records there are, loaded with the rows. Name the
+     * column after the result, such as 'orders_count'. It can be sorted.
+     */
+    public function counts(string $relation): static
+    {
+        $this->aggregate = ['count', $relation, null];
+
+        return $this;
+    }
+
+    /**
+     * The sum of a related column, loaded with the rows. It can be sorted.
+     */
+    public function sum(string $relation, string $column): static
+    {
+        $this->aggregate = ['sum', $relation, $column];
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    public function applyAggregate(Builder $query): void
+    {
+        if ($this->aggregate === null) {
+            return;
+        }
+
+        [$function, $relation, $column] = $this->aggregate;
+
+        // Aliased to the column's name, so the cell reads it like any attribute.
+        $query->withAggregate("{$relation} as {$this->name}", $column ?? '*', $function);
     }
 
     /**
@@ -507,6 +570,14 @@ abstract class Column
      */
     public function assertCanBeQueried(Model $model): void
     {
+        if ($this->aggregate !== null) {
+            if ($this->isSearchable && $this->searchUsing === null) {
+                throw new TableDefinitionException("The column [{$this->name}] adds up related records, so it can't be searched by itself. Pass a closure to searchable().");
+            }
+
+            return;
+        }
+
         [$relations, $attribute] = $this->getPath($model);
         $first = $relations === [] ? null : $model->{$relations[0]}();
         $isPlainColumn = $attribute !== '' && ! str_contains($attribute, '.');
@@ -570,6 +641,12 @@ abstract class Column
             return;
         }
 
+        if ($this->aggregate !== null) {
+            $query->orderBy($this->name, $direction);
+
+            return;
+        }
+
         [$relations, $attribute] = $this->getPath($query->getModel());
 
         if ($relations === []) {
@@ -627,6 +704,7 @@ abstract class Column
                 'grow' => $this->grows,
                 'wrapHeader' => $this->wrapsHeader,
                 'group' => $this->group,
+                'searchableIndividually' => $this->isIndividuallySearchable,
             ]),
             'props' => (object) $this->getProps(),
         ];

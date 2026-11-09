@@ -34,6 +34,7 @@ return [
     'Retry' => 'Retry',
     'Save' => 'Save',
     'Search' => 'Search',
+    'Search :column' => 'Search :column',
     'Select all :count' => 'Select all :count',
     'Select all on this page' => 'Select all on this page',
     'Select row' => 'Select row',

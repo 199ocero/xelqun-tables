@@ -17,6 +17,8 @@ export interface TableColumn {
     wrapHeader?: boolean;
     /** The heading of the ColumnGroup it sits in. */
     group?: string;
+    /** It has a search box of its own. */
+    searchableIndividually?: boolean;
     props: Record<string, any>;
 }
 
@@ -39,6 +41,10 @@ export interface TableRow {
     url?: string;
     /** The heading this row sits under, on a grouped table. */
     group?: string;
+    /** False for a row that can't be selected for bulk actions. */
+    selectable?: boolean;
+    /** The name of the record action a click on the row opens. */
+    action?: string;
     cells: Record<string, TableCell>;
     actions: TableAction[];
 }

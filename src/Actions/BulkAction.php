@@ -17,18 +17,36 @@ use Xelqun\Actions\Action;
  * and they only hold rows the table's query still reaches. For a big selection,
  * take $query instead: the same rows, loaded only as you go through them.
  *
- * A policy ability has to pass for every record, or the action doesn't run.
+ * A policy ability in authorize() has to pass for every record, or the action
+ * doesn't run. authorizeIndividualRecords() runs it on the ones that pass.
  *
  * @api
  */
 class BulkAction extends Action
 {
+    protected ?string $individualAbility = null;
+
+    /** @var array<int, mixed>|null The selected keys the ability allows, once checked. */
+    private ?array $allowedKeys = null;
+
+    /**
+     * Check this policy ability on each selected record, and run the action on
+     * the ones it allows instead of refusing them all. It shows while any of
+     * the selection is allowed.
+     */
+    public function authorizeIndividualRecords(?string $ability): static
+    {
+        $this->individualAbility = $ability;
+
+        return $this;
+    }
+
     /**
      * @return Collection<int, Model>
      */
     public function getRecords(): Collection
     {
-        return $this->getHost()->getSelectedRecords();
+        return $this->individualAbility === null ? $this->getHost()->getSelectedRecords() : $this->getRecordsQuery()->get();
     }
 
     /**
@@ -36,7 +54,22 @@ class BulkAction extends Action
      */
     public function getRecordsQuery(): Builder
     {
-        return $this->getHost()->getSelectedQuery();
+        $query = $this->getHost()->getSelectedQuery();
+
+        return $this->individualAbility === null ? $query : $query->whereKey($this->getAllowedKeys());
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function getAllowedKeys(): array
+    {
+        // shortcut: the allowed keys go back into the query as a list, which grows with the selection; check in SQL through a scope if selections get very large.
+        return $this->allowedKeys ??= $this->getHost()->getSelectedQuery()->cursor()
+            ->filter(fn (Model $record): bool => Gate::allows($this->individualAbility, $record))
+            ->map(fn (Model $record): mixed => $record->getKey())
+            ->values()
+            ->all();
     }
 
     /**
@@ -46,12 +79,16 @@ class BulkAction extends Action
      */
     public function isAuthorized(): bool
     {
+        if ($this->individualAbility !== null && $this->getHost()->hasSelection() && $this->getAllowedKeys() === []) {
+            return false;
+        }
+
         if (! is_string($this->authorization)) {
             return parent::isAuthorized();
         }
 
         return ! $this->getHost()->hasSelection()
-            || $this->getRecordsQuery()->cursor()->every(fn (Model $record): bool => Gate::allows($this->authorization, $record));
+            || $this->getHost()->getSelectedQuery()->cursor()->every(fn (Model $record): bool => Gate::allows($this->authorization, $record));
     }
 
     /**

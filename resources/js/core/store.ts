@@ -191,7 +191,9 @@ export function createTableStore(initial: TableSchema, options: TableStoreOption
     function togglePage(isSelected: boolean): void {
         const next = new Set(selected.value);
 
-        schema.value.rows.forEach((row) => (isSelected ? next.add(row.key) : next.delete(row.key)));
+        schema.value.rows
+            .filter((row) => row.selectable !== false)
+            .forEach((row) => (isSelected ? next.add(row.key) : next.delete(row.key)));
         selected.value = next;
     }
 

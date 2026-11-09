@@ -5,7 +5,7 @@ import type { TableStore } from '../core/store';
 
 const DEBOUNCE_MS = 300;
 
-const props = defineProps<{ value: string; t: TableStore['t'] }>();
+const props = defineProps<{ value: string; t: TableStore['t']; label?: string }>();
 const emit = defineEmits<{ search: [search: string] }>();
 
 const wrapper = useTemplateRef<HTMLElement>('wrapper');
@@ -36,8 +36,8 @@ onScopeDispose(() => clearTimeout(timer));
         <XqInput
             v-model="input"
             type="search"
-            :placeholder="t('Search')"
-            :aria-label="t('Search')"
+            :placeholder="label ?? t('Search')"
+            :aria-label="label ?? t('Search')"
             @update:model-value="search"
         />
     </div>

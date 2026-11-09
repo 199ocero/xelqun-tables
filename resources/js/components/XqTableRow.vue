@@ -2,7 +2,7 @@
 import { cn, XqAction, XqActionGroup, XqCheckbox } from '@xelqun/forms';
 import { ChevronDown, ChevronUp } from '@lucide/vue';
 import type { Component } from 'vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { TableStore } from '../core/store';
 import type { TableColumn, TableRow } from '../schema/types';
 import { actionNode } from './actionNode';
@@ -37,6 +37,19 @@ function isRepeatedRowLink(name: string): boolean {
     return Boolean(props.row.url) && !props.row.cells[name].url && first?.name !== name;
 }
 
+const actionRefs = ref<Record<string, { open?: () => Promise<void> } | null>>({});
+
+/** A click on a row opens its record action, unless it landed on a control or link. */
+function openRecordAction(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+
+    if (!props.row.action || target.closest('a, button, input, label, select, textarea')) {
+        return;
+    }
+
+    void actionRefs.value[props.row.action]?.open?.();
+}
+
 /** A short ripple down the top rows. Past these, waiting for it would feel slow. */
 const delay = computed(() => ({
     animationDelay: `calc(var(--xq-stagger) * ${Math.min(props.index, 8)})`,
@@ -49,10 +62,13 @@ const delay = computed(() => ({
             cn(
                 'border-xq-border animate-xq-rise-in border-b transition-colors duration-(--xq-duration-fast) last:border-b-0',
                 isSelected && 'bg-xq-accent/60',
+                row.action && 'cursor-pointer',
             )
         "
         :style="delay"
         data-xq-table-row
+        :data-xq-row-action="row.action"
+        @click="openRecordAction"
     >
         <td v-if="reorderable" class="px-1 py-2">
             <div class="gap-0.5 grid">
@@ -80,6 +96,7 @@ const delay = computed(() => ({
         </td>
         <td v-if="hasSelection" class="px-3 py-2">
             <XqCheckbox
+                v-if="row.selectable !== false"
                 :model-value="isSelected"
                 :aria-label="t('Select row')"
                 :aria-describedby="titleId"
@@ -135,6 +152,7 @@ const delay = computed(() => ({
                     :is="action.actions ? XqActionGroup : XqAction"
                     v-for="action in row.actions"
                     :key="action.name"
+                    :ref="(element: any) => (actionRefs[action.name] = element)"
                     :node="actionNode(action)"
                     :runner="runner"
                 />

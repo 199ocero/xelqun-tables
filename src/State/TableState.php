@@ -21,6 +21,7 @@ final class TableState
     /**
      * @param  string|null  $sort  A sortable column's name, with a leading "-" for descending.
      * @param  array<string, mixed>  $filters  Every filter field's value.
+     * @param  array<string, string>  $columnSearches  A search of its own for each column that has a box.
      */
     public function __construct(
         public readonly int $page,
@@ -28,6 +29,7 @@ final class TableState
         public readonly string $search = '',
         public readonly ?string $sort = null,
         public readonly array $filters = [],
+        public readonly array $columnSearches = [],
     ) {}
 
     /**
@@ -48,7 +50,28 @@ final class TableState
                 ? $sort
                 : $table->getDefaultSort(),
             filters: self::readFilters($input['filters'] ?? [], $table),
+            columnSearches: self::readColumnSearches($input['column_search'] ?? [], $table),
         );
+    }
+
+    /**
+     * Only columns with a box of their own, and only text.
+     *
+     * @return array<string, string>
+     */
+    private static function readColumnSearches(mixed $input, Table $table): array
+    {
+        $searches = [];
+
+        foreach ($table->getColumns() as $column) {
+            $value = is_array($input) ? ($input[$column->getName()] ?? null) : null;
+
+            if ($column->isIndividuallySearchable() && is_string($value) && trim($value) !== '') {
+                $searches[$column->getName()] = mb_substr(trim($value), 0, self::MAX_SEARCH_LENGTH);
+            }
+        }
+
+        return $searches;
     }
 
     /**
@@ -105,7 +128,7 @@ final class TableState
 
     public function withPage(int $page): self
     {
-        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters);
+        return new self($page, $this->perPage, $this->search, $this->sort, $this->filters, $this->columnSearches);
     }
 
     /**
@@ -127,6 +150,7 @@ final class TableState
             'search' => $this->search === '' ? null : $this->search,
             'sort' => $this->sort === $table->getDefaultSort() ? null : $this->sort,
             'filters' => $filters === [] ? null : $filters,
+            'column_search' => $this->columnSearches === [] ? null : $this->columnSearches,
             'page' => $this->page > 1 ? $this->page : null,
             'per_page' => $this->perPage === $table->getPaginationPageOptions()[0] ? null : $this->perPage,
         ], fn (mixed $value): bool => $value !== null);

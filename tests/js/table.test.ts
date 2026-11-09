@@ -1452,3 +1452,101 @@ describe('table chrome', () => {
         expect(wrapper.find('[data-xq-table-empty] [data-xq-action]').text()).toContain('Create');
     });
 });
+
+describe('records', () => {
+    it('leaves the checkbox off a row that can not be selected, and skips it on select page', async () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    bulkActions: [
+                        { name: 'archive', props: { label: 'Archive', style: 'button' } },
+                    ],
+                    rows: [
+                        { key: '1', cells: { name: { state: 'Open' } }, actions: [] },
+                        {
+                            key: '2',
+                            selectable: false,
+                            cells: { name: { state: 'Locked' } },
+                            actions: [],
+                        },
+                    ],
+                }),
+            },
+        });
+        const rows = wrapper.findAll('[data-xq-table-row]');
+
+        expect(rows[1].find('[role="checkbox"]').exists()).toBe(false);
+
+        await wrapper.find('thead [role="checkbox"]').trigger('click');
+
+        expect(wrapper.text()).toContain('1');
+        expect(rows[0].classes()).toContain('bg-xq-accent/60');
+        expect(wrapper.findAll('[data-xq-table-row]')[1].classes()).not.toContain(
+            'bg-xq-accent/60',
+        );
+    });
+
+    it('opens the record action when the row is clicked', async () => {
+        const fetchMock = respondWith({ form: null });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    rows: [
+                        {
+                            key: '1',
+                            action: 'open',
+                            cells: { name: { state: 'Lamp' } },
+                            actions: [{ name: 'open', props: { label: 'Open', style: 'button' } }],
+                        },
+                    ],
+                }),
+            },
+        });
+
+        await wrapper.find('[data-xq-table-row] td').trigger('click');
+        await flushPromises();
+
+        expect(JSON.parse(sentBody(fetchMock))).toMatchObject({
+            action: 'open',
+            kind: 'record',
+            record: '1',
+        });
+    });
+
+    it('searches a column from its own box', async () => {
+        vi.useFakeTimers();
+
+        const fetchMock = respondWith({ ...schema() });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    columns: [
+                        {
+                            name: 'name',
+                            type: 'text-column',
+                            label: 'Name',
+                            sortable: false,
+                            searchableIndividually: true,
+                            props: {},
+                        },
+                    ],
+                }),
+            },
+        });
+
+        await wrapper.find('[data-xq-table-column-search] input').setValue('lam');
+        vi.advanceTimersByTime(400);
+        await flushPromises();
+        vi.useRealTimers();
+
+        const last = fetchMock.mock.calls.length - 1;
+
+        expect(JSON.parse(sentBody(fetchMock, last)).query.column_search).toEqual({ name: 'lam' });
+    });
+});
