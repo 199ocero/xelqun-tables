@@ -12,6 +12,7 @@ Xelqun Tables is alpha. Until 1.0, a minor version can break existing code, and 
 
 ### Added
 
+- **Groups of rules in the query builder**, as in Filament. A rule's column can be "Group of rules", which holds rules of its own with its own "match any" toggle, so `price > 15 AND (name has Lamp OR name has Sofa)` can be built. Groups nest up to **`maxNestingDepth()`**, 3 by default. **`maxRules()`** limits the rules across every group, and a filter past the limit is ignored as a whole. Rules saved in a URL or the session before keep working.
 - **Tables of custom data**, as in Filament. Call `records()` in `boot()` with a closure that returns rows keyed by a stable key, from an API or anywhere else. It can ask for `$search`, `$columnSearches`, `$filters`, `$sortColumn`, `$sortDirection`, `$page` and `$recordsPerPage`. An array or collection is every row, and the table paginates it. A paginator is one page, as given.
     - Each row reaches columns and actions as an **`ArrayRecord`**: read it as `$record['title']` or `$record->title`, and get the array back with `toArray()`. It can't be saved or deleted, and a string `authorize()` ability denies unless a gate of that name allows it.
     - **`resolveSelectedRecordsUsing()`** finds rows again by key for actions. Without it, `records()` runs with no search or filters and all rows on one page. Rows the resolver returns beyond the keys it was asked for are dropped.

@@ -3,6 +3,7 @@
 namespace Xelqun\Tables\Filters;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Xelqun\Forms\Components\DatePicker;
 use Xelqun\Forms\Components\Repeater;
 use Xelqun\Forms\Components\Select;
@@ -20,13 +21,20 @@ use Xelqun\Tables\Filters\Constraints\Constraint;
  */
 class QueryBuilder extends BaseFilter
 {
+    /** The constraint value a row has when it is a group of rules. */
+    public const string GROUP = '__group';
+
+    /** @var array<int, Constraint> */
+    protected array $constraints = [];
+
+    protected int $maxNestingDepth = 3;
+
+    protected ?int $maxRules = null;
+
     public function needsQuery(): bool
     {
         return true;
     }
-
-    /** @var array<int, Constraint> */
-    protected array $constraints = [];
 
     /**
      * @param  array<int, Constraint>  $constraints
@@ -38,52 +46,92 @@ class QueryBuilder extends BaseFilter
         return $this;
     }
 
+    /**
+     * How deep groups of rules can go. 1 allows no groups, only rules.
+     */
+    public function maxNestingDepth(int $depth): static
+    {
+        $this->maxNestingDepth = max(1, $depth);
+
+        return $this;
+    }
+
+    /**
+     * The most rules, counted across every group. Rules past it are not
+     * applied in part: the whole filter is ignored, as in Filament.
+     */
+    public function maxRules(?int $count): static
+    {
+        $this->maxRules = $count;
+
+        return $this;
+    }
+
     public function getFormComponents(): array
     {
         return [
-            Repeater::make($this->name)
-                ->label($this->getLabel())
-                ->defaultItems(0)
-                ->columns(2)
-                ->schema([
-                    Select::make('constraint')
-                        ->label(__('xelqun-tables::messages.query_builder.column'))
-                        ->required()
-                        ->live()
-                        ->options(collect($this->constraints)->mapWithKeys(fn (Constraint $constraint): array => [$constraint->getAttribute() => $constraint->getLabel()])->all()),
-                    Select::make('operator')
-                        ->label(__('xelqun-tables::messages.query_builder.operator'))
-                        ->required()
-                        ->options(fn (Get $get): array => $this->findConstraint($get('constraint'))?->getOperators() ?? []),
-                    // One field for each kind of value, shown for the constraints that take it.
-                    TextInput::make('value')
-                        ->label(__('xelqun-tables::messages.query_builder.value'))
-                        ->columnSpanFull()
-                        ->visibleWhen(When::in('constraint', $this->constraintsTaking('value'))),
-                    Select::make('option')
-                        ->label(__('xelqun-tables::messages.query_builder.value'))
-                        ->columnSpanFull()
-                        ->options(fn (Get $get): array => $this->findConstraint($get('constraint'))?->getOptions() ?? [])
-                        ->visibleWhen(When::in('constraint', $this->constraintsTaking('option'))),
-                    DatePicker::make('date')
-                        ->label(__('xelqun-tables::messages.query_builder.value'))
-                        ->columnSpanFull()
-                        ->visibleWhen(When::in('constraint', $this->constraintsTaking('date'))),
-                ]),
+            $this->makeRulesRepeater($this->name, 1)->label($this->getLabel()),
             Toggle::make($this->matchFieldName())->label(__('xelqun-tables::messages.query_builder.match_any')),
         ];
     }
 
+    /**
+     * The rules at one depth. A row is a rule, or below the deepest level, a
+     * group with rules and a match toggle of its own.
+     */
+    private function makeRulesRepeater(string $name, int $depth): Repeater
+    {
+        $canNest = $depth < $this->maxNestingDepth;
+        $isRule = When::neq('constraint', self::GROUP);
+
+        return Repeater::make($name)
+            ->defaultItems(0)
+            ->columns(2)
+            ->schema([
+                Select::make('constraint')
+                    ->label(__('xelqun-tables::messages.query_builder.column'))
+                    ->required()
+                    ->live()
+                    ->options([
+                        ...collect($this->constraints)->mapWithKeys(fn (Constraint $constraint): array => [$constraint->getAttribute() => $constraint->getLabel()])->all(),
+                        ...($canNest ? [self::GROUP => __('xelqun-tables::messages.query_builder.group')] : []),
+                    ]),
+                Select::make('operator')
+                    ->label(__('xelqun-tables::messages.query_builder.operator'))
+                    ->requiredWhen($isRule)
+                    ->visibleWhen($isRule)
+                    ->options(fn (Get $get): array => $this->findConstraint($get('constraint'))?->getOperators() ?? []),
+                // One field for each kind of value, shown for the constraints that take it.
+                TextInput::make('value')
+                    ->label(__('xelqun-tables::messages.query_builder.value'))
+                    ->columnSpanFull()
+                    ->visibleWhen(When::in('constraint', $this->constraintsTaking('value'))),
+                Select::make('option')
+                    ->label(__('xelqun-tables::messages.query_builder.value'))
+                    ->columnSpanFull()
+                    ->options(fn (Get $get): array => $this->findConstraint($get('constraint'))?->getOptions() ?? [])
+                    ->visibleWhen(When::in('constraint', $this->constraintsTaking('option'))),
+                DatePicker::make('date')
+                    ->label(__('xelqun-tables::messages.query_builder.value'))
+                    ->columnSpanFull()
+                    ->visibleWhen(When::in('constraint', $this->constraintsTaking('date'))),
+                ...($canNest ? [
+                    Toggle::make('match_any')
+                        ->label(__('xelqun-tables::messages.query_builder.match_any'))
+                        ->columnSpanFull()
+                        ->visibleWhen(When::eq('constraint', self::GROUP)),
+                    $this->makeRulesRepeater('rules', $depth + 1)
+                        ->label(__('xelqun-tables::messages.query_builder.rules'))
+                        ->columnSpanFull()
+                        ->visibleWhen(When::eq('constraint', self::GROUP)),
+                ] : []),
+            ]);
+    }
+
     public function apply(Builder $query, array $data): void
     {
-        $boolean = ($data[$this->matchFieldName()] ?? false) ? 'or' : 'and';
-
-        foreach ((array) ($data[$this->name] ?? []) as $rule) {
-            $constraint = $this->findConstraint($rule['constraint'] ?? null);
-
-            if ($constraint !== null && $this->isUsable($rule)) {
-                $query->where(fn (Builder $group) => $constraint->apply($group, (string) ($rule['operator'] ?? ''), $this->valueOf($constraint, $rule)), boolean: $boolean);
-            }
+        if ($this->isWithinLimits($data)) {
+            $this->applyRules($query, (array) ($data[$this->name] ?? []), (bool) ($data[$this->matchFieldName()] ?? false), 1);
         }
     }
 
@@ -92,7 +140,75 @@ class QueryBuilder extends BaseFilter
      */
     public function isActive(array $data): bool
     {
-        return array_filter((array) ($data[$this->name] ?? []), fn (mixed $rule): bool => is_array($rule) && $this->isUsable($rule)) !== [];
+        return $this->isWithinLimits($data) && $this->countUsable((array) ($data[$this->name] ?? []), 1) > 0;
+    }
+
+    /**
+     * @param  Builder<covariant Model>  $query
+     * @param  array<array-key, mixed>  $rules
+     */
+    private function applyRules(Builder $query, array $rules, bool $matchAny, int $depth): void
+    {
+        $boolean = $matchAny ? 'or' : 'and';
+
+        foreach ($rules as $rule) {
+            if (! is_array($rule) || $this->countUsable([$rule], $depth) === 0) {
+                continue;
+            }
+
+            if ($this->isGroup($rule, $depth)) {
+                $query->where(fn (Builder $group) => $this->applyRules($group, (array) ($rule['rules'] ?? []), (bool) ($rule['match_any'] ?? false), $depth + 1), boolean: $boolean);
+
+                continue;
+            }
+
+            $constraint = $this->findConstraint($rule['constraint'] ?? null);
+
+            if ($constraint !== null) {
+                $query->where(fn (Builder $group) => $constraint->apply($group, (string) ($rule['operator'] ?? ''), $this->valueOf($constraint, $rule)), boolean: $boolean);
+            }
+        }
+    }
+
+    /**
+     * The rules that would change the rows, in groups too. A group deeper
+     * than the form allows counts nothing, so it can't be posted around it.
+     *
+     * @param  array<array-key, mixed>  $rules
+     */
+    private function countUsable(array $rules, int $depth): int
+    {
+        $count = 0;
+
+        foreach ($rules as $rule) {
+            if (! is_array($rule)) {
+                continue;
+            }
+
+            if ($this->isGroup($rule, $depth)) {
+                $count += $this->countUsable((array) ($rule['rules'] ?? []), $depth + 1);
+            } elseif ($this->isUsable($rule)) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function isWithinLimits(array $data): bool
+    {
+        return $this->maxRules === null || $this->countUsable((array) ($data[$this->name] ?? []), 1) <= $this->maxRules;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $rule
+     */
+    private function isGroup(array $rule, int $depth): bool
+    {
+        return ($rule['constraint'] ?? null) === self::GROUP && $depth < $this->maxNestingDepth;
     }
 
     /**

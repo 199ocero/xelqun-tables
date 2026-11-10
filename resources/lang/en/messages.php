@@ -13,6 +13,8 @@ return [
         'operator' => 'Operator',
         'value' => 'Value',
         'match_any' => 'Match any rule, not all',
+        'group' => 'Group of rules',
+        'rules' => 'Rules',
     ],
 
     'operators' => [

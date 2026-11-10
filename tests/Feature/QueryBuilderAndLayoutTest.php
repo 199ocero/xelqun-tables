@@ -52,6 +52,8 @@ class BuilderTable extends Table
 {
     public static bool $canReorder = true;
 
+    public static ?int $maxRules = null;
+
     /** @var array<int, Column>|null */
     public static ?array $columns = null;
 
@@ -67,7 +69,7 @@ class BuilderTable extends Table
 
     public function filters(): array
     {
-        return [QueryBuilder::make('rules')->constraints([
+        return [QueryBuilder::make('rules')->maxRules(self::$maxRules)->constraints([
             TextConstraint::make('name'),
             NumberConstraint::make('price'),
             DateConstraint::make('created_at'),
@@ -107,6 +109,7 @@ function move(int $record, string $direction): TestResponse
 
 beforeEach(function () {
     BuilderTable::$canReorder = true;
+    BuilderTable::$maxRules = null;
     BuilderTable::$columns = null;
 
     $audio = Category::create(['name' => 'Audio']);
@@ -131,6 +134,38 @@ describe('the query builder', function () {
         'a relation' => [rule('category.name', 'contains', 'Aud'), ['Desk']],
         'a date' => [rule('created_at', 'after', '2000-01-01', 'date'), ['Lamp', 'Desk', 'Sofa']],
     ]);
+
+    it('nests a group of rules with its own match', function () {
+        $group = ['constraint' => QueryBuilder::GROUP, 'match_any' => true, 'rules' => [rule('name', 'contains', 'Lamp'), rule('name', 'contains', 'Sofa')]];
+
+        expect(matching([rule('price', 'greater', '15'), $group]))->toBe(['Sofa'])
+            ->and(matching([$group]))->toEqualCanonicalizing(['Lamp', 'Sofa']);
+    });
+
+    it('treats an empty group as no filter', function () {
+        $table = BuilderTable::make();
+        $state = TableState::from(['filters' => ['rules' => [['constraint' => QueryBuilder::GROUP, 'rules' => []]]]], $table);
+
+        expect($table->toResult($state)['activeFilters'])->toBe(0);
+    });
+
+    it('ignores a group deeper than the form allows', function () {
+        $deepest = rule('name', 'contains', 'Lamp');
+
+        foreach (range(1, 3) as $level) {
+            $deepest = ['constraint' => QueryBuilder::GROUP, 'rules' => [$deepest]];
+        }
+
+        // Three groups deep is past the default depth of 3, so nothing filters.
+        expect(matching([$deepest]))->toEqualCanonicalizing(['Lamp', 'Desk', 'Sofa']);
+    });
+
+    it('ignores the whole filter past its rule limit', function () {
+        BuilderTable::$maxRules = 1;
+        $rules = [rule('name', 'contains', 'Lamp'), ['constraint' => QueryBuilder::GROUP, 'rules' => [rule('name', 'contains', 'Sofa')]]];
+
+        expect(matching($rules))->toEqualCanonicalizing(['Lamp', 'Desk', 'Sofa']);
+    });
 
     it('needs every rule, or any of them', function () {
         $rules = [rule('name', 'contains', 'Lamp'), rule('status', 'equals', 'live', 'option')];
