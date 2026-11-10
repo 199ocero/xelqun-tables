@@ -1,7 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick } from 'vue';
-import { createFormStore, createXelqunForms, defaultComponents, XqForm } from '@xelqun/forms';
+import {
+    createFormStore,
+    createXelqunForms,
+    defaultComponents,
+    XqForm,
+    XqSelect,
+} from '@xelqun/forms';
 import { fieldNode, formSchema } from '@xelqun/forms/testing';
 import { builtInCells } from '../../resources/js/components/cells';
 import XqTable from '../../resources/js/components/XqTable.vue';
@@ -1677,6 +1683,31 @@ describe('groups and picking', () => {
 
         expect(form.get('data.category_id')).toBe('8');
         expect(wrapper.find('[data-xq-modal-table-select]').text()).toContain('Lamps');
+        wrapper.unmount();
+    });
+});
+
+describe('the group picker', () => {
+    it('offers no grouping without an empty option value, and asks for none with an empty group', async () => {
+        const table = schema({ groups: [{ name: 'status', label: 'Status' }], group: 'status' });
+        const fetchMock = respondWith({ ...table });
+
+        vi.stubGlobal('fetch', fetchMock);
+
+        const wrapper = mount(XqTable, { props: { table }, attachTo: document.body });
+        const picker = wrapper.findAllComponents(XqSelect)[0]!;
+
+        expect(picker.props('options')).toEqual([
+            { value: '__none', label: 'No grouping' },
+            { value: 'status', label: 'Status' },
+        ]);
+
+        picker.vm.$emit('update:modelValue', '__none');
+        await flushPromises();
+
+        const last = fetchMock.mock.calls.length - 1;
+
+        expect(JSON.parse(sentBody(fetchMock, last)).query.group).toBe('');
         wrapper.unmount();
     });
 });

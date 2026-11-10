@@ -2,6 +2,13 @@
 
 Xelqun Tables is alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Fixed
+
+- The group picker works. Its "No grouping" option had an empty value, which the select refused, so the picker and the page size select beside it stopped working.
+- A table whose only toolbar control is the group picker shows it.
+
 ## 0.7.0 - 2026-11-10
 
 The schema version (`$xq`) stays 1. This needs `xelqun/forms` 0.9: `composer update xelqun/tables xelqun/forms` and `npm install @xelqun/tables@0.7.0 @xelqun/forms@0.9.0`.

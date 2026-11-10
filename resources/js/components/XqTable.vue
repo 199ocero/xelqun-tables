@@ -133,7 +133,8 @@ const hasToolbar = computed(
         sortOptions.value.length > 0 ||
         schema.value.filters !== null ||
         toggleableColumns.value.length > 0 ||
-        schema.value.headerActions.length > 0,
+        schema.value.headerActions.length > 0 ||
+        (schema.value.groups?.length ?? 0) > 0,
 );
 
 const columnCount = computed(
@@ -184,8 +185,11 @@ const columnGroups = computed(() => {
     return runs;
 });
 
+/** The select can't hold an empty value, so "no grouping" has a name of its own here. */
+const NO_GROUP = '__none';
+
 const groupOptions = computed(() => [
-    { value: '', label: t('No grouping') },
+    { value: NO_GROUP, label: t('No grouping') },
     ...(schema.value.groups ?? []).map((group) => ({ value: group.name, label: group.label })),
 ]);
 const activeGroup = computed(() =>
@@ -411,11 +415,16 @@ onMounted(() => {
                 <label :for="`xq-${schema.id}-group`" class="sr-only">{{ t('Group by') }}</label>
                 <XqSelect
                     :id="`xq-${schema.id}-group`"
-                    :model-value="schema.group ?? ''"
+                    :model-value="schema.group ?? NO_GROUP"
                     :options="groupOptions"
                     :placeholder="t('Group by')"
                     class="w-48"
-                    @update:model-value="store.update({ group: String($event ?? ''), page: 1 })"
+                    @update:model-value="
+                        store.update({
+                            group: $event == null || $event === NO_GROUP ? '' : String($event),
+                            page: 1,
+                        })
+                    "
                 />
             </template>
             <XqTableFilters
