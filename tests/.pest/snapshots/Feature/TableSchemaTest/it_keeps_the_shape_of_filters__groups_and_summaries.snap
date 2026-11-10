@@ -1,0 +1,675 @@
+{
+    "$xq": 1,
+    "pkg": "0.7.1",
+    "id": "summaries-table",
+    "endpoints": {
+        "query": "\/_xelqun\/tables\/query",
+        "update": "\/_xelqun\/tables\/update",
+        "reorder": "\/_xelqun\/tables\/reorder",
+        "action": "\/_xelqun\/tables\/action"
+    },
+    "searchable": false,
+    "columns": [
+        {
+            "name": "name",
+            "type": "text-column",
+            "label": "Name",
+            "sortable": false,
+            "props": {}
+        },
+        {
+            "name": "price",
+            "type": "text-column",
+            "label": "Price",
+            "sortable": false,
+            "props": {}
+        }
+    ],
+    "headerActions": [],
+    "maxSelectable": 1000,
+    "layout": {
+        "grid": null,
+        "striped": false,
+        "pollSeconds": null,
+        "reorderable": false
+    },
+    "filters": {
+        "$xq": 1,
+        "id": "summaries-table-filters",
+        "endpoints": {
+            "update": "\/_xelqun\/forms\/update",
+            "upload": "\/_xelqun\/forms\/upload",
+            "search": "\/_xelqun\/forms\/search",
+            "validate": "\/_xelqun\/forms\/validate",
+            "action": "\/_xelqun\/forms\/action"
+        },
+        "locale": "en",
+        "state": {
+            "data": {
+                "status": null,
+                "rules": {},
+                "rules_match_any": false
+            }
+        },
+        "components": [
+            {
+                "key": "data.status",
+                "type": "select",
+                "hidden": false,
+                "path": "data.status",
+                "label": "Status",
+                "hint": null,
+                "placeholder": null,
+                "required": false,
+                "disabled": false,
+                "rules": {
+                    "visible": null,
+                    "required": null,
+                    "disabled": null
+                },
+                "computed": null,
+                "live": null,
+                "span": null,
+                "props": {
+                    "options": [
+                        {
+                            "value": "live",
+                            "label": "Live"
+                        }
+                    ],
+                    "searchable": false,
+                    "multiple": false,
+                    "async": false,
+                    "searchDebounce": 250
+                },
+                "children": [],
+                "deps": []
+            },
+            {
+                "key": "data.rules",
+                "type": "repeater",
+                "hidden": false,
+                "path": "data.rules",
+                "label": "Rules",
+                "hint": null,
+                "placeholder": null,
+                "required": false,
+                "disabled": false,
+                "rules": {
+                    "visible": null,
+                    "required": null,
+                    "disabled": null
+                },
+                "computed": null,
+                "live": null,
+                "containsRows": true,
+                "span": null,
+                "props": {
+                    "template": [
+                        {
+                            "key": "data.rules.{row}.constraint",
+                            "type": "select",
+                            "hidden": false,
+                            "path": "data.rules.{row}.constraint",
+                            "label": "Column",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": true,
+                            "disabled": false,
+                            "rules": {
+                                "visible": null,
+                                "required": null,
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": {
+                                "mode": "change",
+                                "ms": null
+                            },
+                            "span": null,
+                            "props": {
+                                "options": [
+                                    {
+                                        "value": "name",
+                                        "label": "Name"
+                                    },
+                                    {
+                                        "value": "__group",
+                                        "label": "Group of rules"
+                                    }
+                                ],
+                                "searchable": false,
+                                "multiple": false,
+                                "async": false,
+                                "searchDebounce": 250
+                            },
+                            "children": [],
+                            "deps": []
+                        },
+                        {
+                            "key": "data.rules.{row}.operator",
+                            "type": "select",
+                            "hidden": false,
+                            "path": "data.rules.{row}.operator",
+                            "label": "Operator",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": false,
+                            "disabled": false,
+                            "rules": {
+                                "visible": {
+                                    "op": "neq",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": "__group"
+                                },
+                                "required": {
+                                    "op": "neq",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": "__group"
+                                },
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": null,
+                            "span": null,
+                            "props": {
+                                "options": [],
+                                "searchable": false,
+                                "multiple": false,
+                                "async": false,
+                                "searchDebounce": 250
+                            },
+                            "children": [],
+                            "deps": [
+                                "data.rules.{row}.constraint"
+                            ]
+                        },
+                        {
+                            "key": "data.rules.{row}.value",
+                            "type": "text-input",
+                            "hidden": false,
+                            "path": "data.rules.{row}.value",
+                            "label": "Value",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": false,
+                            "disabled": false,
+                            "rules": {
+                                "visible": {
+                                    "op": "in",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": [
+                                        "name"
+                                    ]
+                                },
+                                "required": null,
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": null,
+                            "span": "full",
+                            "props": {
+                                "inputType": "text",
+                                "numeric": false,
+                                "integer": false,
+                                "min": null,
+                                "max": null,
+                                "step": null,
+                                "maxLength": null,
+                                "prefix": null,
+                                "suffix": null,
+                                "autocomplete": null
+                            },
+                            "children": [],
+                            "deps": []
+                        },
+                        {
+                            "key": "data.rules.{row}.option",
+                            "type": "select",
+                            "hidden": false,
+                            "path": "data.rules.{row}.option",
+                            "label": "Value",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": false,
+                            "disabled": false,
+                            "rules": {
+                                "visible": {
+                                    "op": "in",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": []
+                                },
+                                "required": null,
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": null,
+                            "span": "full",
+                            "props": {
+                                "options": [],
+                                "searchable": false,
+                                "multiple": false,
+                                "async": false,
+                                "searchDebounce": 250
+                            },
+                            "children": [],
+                            "deps": [
+                                "data.rules.{row}.constraint"
+                            ]
+                        },
+                        {
+                            "key": "data.rules.{row}.date",
+                            "type": "date-picker",
+                            "hidden": false,
+                            "path": "data.rules.{row}.date",
+                            "label": "Value",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": false,
+                            "disabled": false,
+                            "rules": {
+                                "visible": {
+                                    "op": "in",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": []
+                                },
+                                "required": null,
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": null,
+                            "span": "full",
+                            "props": {
+                                "min": null,
+                                "max": null
+                            },
+                            "children": [],
+                            "deps": []
+                        },
+                        {
+                            "key": "data.rules.{row}.match_any",
+                            "type": "toggle",
+                            "hidden": false,
+                            "path": "data.rules.{row}.match_any",
+                            "label": "Match any rule, not all",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": false,
+                            "disabled": false,
+                            "rules": {
+                                "visible": {
+                                    "op": "eq",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": "__group"
+                                },
+                                "required": null,
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": null,
+                            "span": "full",
+                            "props": {
+                                "description": null
+                            },
+                            "children": [],
+                            "deps": []
+                        },
+                        {
+                            "key": "data.rules.{row}.rules",
+                            "type": "repeater",
+                            "hidden": false,
+                            "path": "data.rules.{row}.rules",
+                            "label": "Rules",
+                            "hint": null,
+                            "placeholder": null,
+                            "required": false,
+                            "disabled": false,
+                            "rules": {
+                                "visible": {
+                                    "op": "eq",
+                                    "path": "data.rules.{row}.constraint",
+                                    "value": "__group"
+                                },
+                                "required": null,
+                                "disabled": null
+                            },
+                            "computed": null,
+                            "live": null,
+                            "containsRows": true,
+                            "span": "full",
+                            "props": {
+                                "template": [
+                                    {
+                                        "key": "data.rules.{row}.rules.{row:1}.constraint",
+                                        "type": "select",
+                                        "hidden": false,
+                                        "path": "data.rules.{row}.rules.{row:1}.constraint",
+                                        "label": "Column",
+                                        "hint": null,
+                                        "placeholder": null,
+                                        "required": true,
+                                        "disabled": false,
+                                        "rules": {
+                                            "visible": null,
+                                            "required": null,
+                                            "disabled": null
+                                        },
+                                        "computed": null,
+                                        "live": {
+                                            "mode": "change",
+                                            "ms": null
+                                        },
+                                        "span": null,
+                                        "props": {
+                                            "options": [
+                                                {
+                                                    "value": "name",
+                                                    "label": "Name"
+                                                }
+                                            ],
+                                            "searchable": false,
+                                            "multiple": false,
+                                            "async": false,
+                                            "searchDebounce": 250
+                                        },
+                                        "children": [],
+                                        "deps": []
+                                    },
+                                    {
+                                        "key": "data.rules.{row}.rules.{row:1}.operator",
+                                        "type": "select",
+                                        "hidden": false,
+                                        "path": "data.rules.{row}.rules.{row:1}.operator",
+                                        "label": "Operator",
+                                        "hint": null,
+                                        "placeholder": null,
+                                        "required": false,
+                                        "disabled": false,
+                                        "rules": {
+                                            "visible": {
+                                                "op": "neq",
+                                                "path": "data.rules.{row}.rules.{row:1}.constraint",
+                                                "value": "__group"
+                                            },
+                                            "required": {
+                                                "op": "neq",
+                                                "path": "data.rules.{row}.rules.{row:1}.constraint",
+                                                "value": "__group"
+                                            },
+                                            "disabled": null
+                                        },
+                                        "computed": null,
+                                        "live": null,
+                                        "span": null,
+                                        "props": {
+                                            "options": [],
+                                            "searchable": false,
+                                            "multiple": false,
+                                            "async": false,
+                                            "searchDebounce": 250
+                                        },
+                                        "children": [],
+                                        "deps": [
+                                            "data.rules.{row}.rules.{row:1}.constraint"
+                                        ]
+                                    },
+                                    {
+                                        "key": "data.rules.{row}.rules.{row:1}.value",
+                                        "type": "text-input",
+                                        "hidden": false,
+                                        "path": "data.rules.{row}.rules.{row:1}.value",
+                                        "label": "Value",
+                                        "hint": null,
+                                        "placeholder": null,
+                                        "required": false,
+                                        "disabled": false,
+                                        "rules": {
+                                            "visible": {
+                                                "op": "in",
+                                                "path": "data.rules.{row}.rules.{row:1}.constraint",
+                                                "value": [
+                                                    "name"
+                                                ]
+                                            },
+                                            "required": null,
+                                            "disabled": null
+                                        },
+                                        "computed": null,
+                                        "live": null,
+                                        "span": "full",
+                                        "props": {
+                                            "inputType": "text",
+                                            "numeric": false,
+                                            "integer": false,
+                                            "min": null,
+                                            "max": null,
+                                            "step": null,
+                                            "maxLength": null,
+                                            "prefix": null,
+                                            "suffix": null,
+                                            "autocomplete": null
+                                        },
+                                        "children": [],
+                                        "deps": []
+                                    },
+                                    {
+                                        "key": "data.rules.{row}.rules.{row:1}.option",
+                                        "type": "select",
+                                        "hidden": false,
+                                        "path": "data.rules.{row}.rules.{row:1}.option",
+                                        "label": "Value",
+                                        "hint": null,
+                                        "placeholder": null,
+                                        "required": false,
+                                        "disabled": false,
+                                        "rules": {
+                                            "visible": {
+                                                "op": "in",
+                                                "path": "data.rules.{row}.rules.{row:1}.constraint",
+                                                "value": []
+                                            },
+                                            "required": null,
+                                            "disabled": null
+                                        },
+                                        "computed": null,
+                                        "live": null,
+                                        "span": "full",
+                                        "props": {
+                                            "options": [],
+                                            "searchable": false,
+                                            "multiple": false,
+                                            "async": false,
+                                            "searchDebounce": 250
+                                        },
+                                        "children": [],
+                                        "deps": [
+                                            "data.rules.{row}.rules.{row:1}.constraint"
+                                        ]
+                                    },
+                                    {
+                                        "key": "data.rules.{row}.rules.{row:1}.date",
+                                        "type": "date-picker",
+                                        "hidden": false,
+                                        "path": "data.rules.{row}.rules.{row:1}.date",
+                                        "label": "Value",
+                                        "hint": null,
+                                        "placeholder": null,
+                                        "required": false,
+                                        "disabled": false,
+                                        "rules": {
+                                            "visible": {
+                                                "op": "in",
+                                                "path": "data.rules.{row}.rules.{row:1}.constraint",
+                                                "value": []
+                                            },
+                                            "required": null,
+                                            "disabled": null
+                                        },
+                                        "computed": null,
+                                        "live": null,
+                                        "span": "full",
+                                        "props": {
+                                            "min": null,
+                                            "max": null
+                                        },
+                                        "children": [],
+                                        "deps": []
+                                    }
+                                ],
+                                "rowPlaceholder": "{row:1}",
+                                "rows": {},
+                                "newRow": {
+                                    "constraint": null,
+                                    "operator": null,
+                                    "value": null,
+                                    "option": null,
+                                    "date": null
+                                },
+                                "minItems": 0,
+                                "maxItems": null,
+                                "addLabel": "Add item",
+                                "itemLabel": "Item",
+                                "orderable": true,
+                                "columns": {
+                                    "default": 1,
+                                    "md": 2
+                                },
+                                "addable": true,
+                                "deletable": true,
+                                "itemNumbers": true,
+                                "draggable": true
+                            },
+                            "children": [],
+                            "deps": []
+                        }
+                    ],
+                    "rowPlaceholder": "{row}",
+                    "rows": {},
+                    "newRow": {
+                        "constraint": null,
+                        "operator": null,
+                        "value": null,
+                        "option": null,
+                        "date": null,
+                        "match_any": false,
+                        "rules": {}
+                    },
+                    "minItems": 0,
+                    "maxItems": null,
+                    "addLabel": "Add item",
+                    "itemLabel": "Item",
+                    "orderable": true,
+                    "columns": {
+                        "default": 1,
+                        "md": 2
+                    },
+                    "addable": true,
+                    "deletable": true,
+                    "itemNumbers": true,
+                    "draggable": true
+                },
+                "children": [],
+                "deps": []
+            },
+            {
+                "key": "data.rules_match_any",
+                "type": "toggle",
+                "hidden": false,
+                "path": "data.rules_match_any",
+                "label": "Match any rule, not all",
+                "hint": null,
+                "placeholder": null,
+                "required": false,
+                "disabled": false,
+                "rules": {
+                    "visible": null,
+                    "required": null,
+                    "disabled": null
+                },
+                "computed": null,
+                "live": null,
+                "span": null,
+                "props": {
+                    "description": null
+                },
+                "children": [],
+                "deps": []
+            }
+        ]
+    },
+    "filterDefaults": {
+        "status": null,
+        "rules": [],
+        "rules_match_any": false
+    },
+    "groups": [
+        {
+            "name": "status",
+            "label": "Status"
+        }
+    ],
+    "query": {},
+    "sort": null,
+    "activeFilters": 0,
+    "indicators": [],
+    "group": "status",
+    "bulkActions": [],
+    "summaries": {
+        "price": [
+            {
+                "label": "Total",
+                "value": 150
+            }
+        ]
+    },
+    "groupSummaries": {
+        "\"live\"": {
+            "price": [
+                {
+                    "label": "Total",
+                    "value": 150
+                }
+            ]
+        }
+    },
+    "rows": [
+        {
+            "key": "1",
+            "groupKey": "\"live\"",
+            "group": "live",
+            "cells": {
+                "name": {
+                    "state": "Keyboard"
+                },
+                "price": {
+                    "state": 120
+                }
+            },
+            "actions": []
+        },
+        {
+            "key": "2",
+            "groupKey": "\"live\"",
+            "group": "live",
+            "cells": {
+                "name": {
+                    "state": "Mouse"
+                },
+                "price": {
+                    "state": 30
+                }
+            },
+            "actions": []
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "perPage": 2,
+        "total": 2,
+        "lastPage": 1,
+        "options": [
+            2,
+            5
+        ]
+    }
+}

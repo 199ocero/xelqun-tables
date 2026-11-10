@@ -9,7 +9,11 @@ use Xelqun\Tables\Columns\Column;
 use Xelqun\Tables\Columns\ColumnGroup;
 use Xelqun\Tables\Columns\TextColumn;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
+use Xelqun\Tables\Filters\Constraints\TextConstraint;
+use Xelqun\Tables\Filters\QueryBuilder;
+use Xelqun\Tables\Filters\SelectFilter;
 use Xelqun\Tables\Schema\SchemaVersion;
+use Xelqun\Tables\Summarizers\Sum;
 use Xelqun\Tables\Table;
 use Xelqun\Tables\Tests\Fixtures\Category;
 use Xelqun\Tables\Tests\Fixtures\Product;
@@ -36,6 +40,35 @@ it('keeps the shape of the schema', function () {
     Product::create(['name' => 'Keyboard', 'price' => 120]);
 
     expect(json_encode(Arr::except(ProductsTable::make()->toSchema(), 'token'), JSON_PRETTY_PRINT))->toMatchSnapshot();
+});
+
+it('keeps the shape of filters, groups and summaries', function () {
+    $table = new class extends ProductsTable
+    {
+        protected function boot(): void
+        {
+            parent::boot();
+            $this->id('summaries-table')->defaultGroup('status')->groups(['status']);
+        }
+
+        public function columns(): array
+        {
+            return [TextColumn::make('name'), TextColumn::make('price')->summarize(Sum::make()->label('Total'))];
+        }
+
+        public function filters(): array
+        {
+            return [
+                SelectFilter::make('status')->options(['live' => 'Live']),
+                QueryBuilder::make('rules')->maxNestingDepth(2)->constraints([TextConstraint::make('name')]),
+            ];
+        }
+    };
+    Product::create(['name' => 'Keyboard', 'price' => 120, 'status' => 'live']);
+    Product::create(['name' => 'Mouse', 'price' => 30, 'status' => 'live']);
+
+    // Each token is random, and forms' version changes with each forms release, so they stay out.
+    expect(json_encode(Arr::except($table->toSchema(), ['token', 'filters.token', 'filters.pkg']), JSON_PRETTY_PRINT))->toMatchSnapshot();
 });
 
 it('sends the version the browser checks', function () {
