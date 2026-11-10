@@ -20,6 +20,11 @@ use Xelqun\Tables\Filters\Constraints\Constraint;
  */
 class QueryBuilder extends BaseFilter
 {
+    public function needsQuery(): bool
+    {
+        return true;
+    }
+
     /** @var array<int, Constraint> */
     protected array $constraints = [];
 

@@ -36,8 +36,8 @@ class ReorderController
         // shortcut: rows with equal positions stay put, so give the column distinct values. Renumber here if an app can't.
         $neighbour = $table->getReorderQuery()
             ->reorder()
-            ->where($table->query()->qualifyColumn($column), $isUp ? '<' : '>', $position)
-            ->orderBy($table->query()->qualifyColumn($column), $isUp ? 'desc' : 'asc')
+            ->where($table->getQuery()->qualifyColumn($column), $isUp ? '<' : '>', $position)
+            ->orderBy($table->getQuery()->qualifyColumn($column), $isUp ? 'desc' : 'asc')
             ->first();
 
         if ($neighbour !== null) {

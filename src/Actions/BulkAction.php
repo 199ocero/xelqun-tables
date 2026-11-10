@@ -42,11 +42,22 @@ class BulkAction extends Action
     }
 
     /**
-     * @return Collection<int, Model>
+     * @return Collection<int, covariant Model>
      */
     public function getRecords(): Collection
     {
-        return $this->individualAbility === null ? $this->getHost()->getSelectedRecords() : $this->getRecordsQuery()->get();
+        if ($this->individualAbility === null) {
+            return $this->getHost()->getSelectedRecords();
+        }
+
+        if ($this->getHost()->usesCustomData()) {
+            // No query to narrow, so the allowed rows come from the selection.
+            return $this->getHost()->getSelectedRecords()
+                ->filter(fn (Model $record): bool => in_array($record->getKey(), $this->getAllowedKeys(), true))
+                ->values();
+        }
+
+        return $this->getRecordsQuery()->get();
     }
 
     /**
@@ -65,7 +76,7 @@ class BulkAction extends Action
     private function getAllowedKeys(): array
     {
         // shortcut: the allowed keys go back into the query as a list, which grows with the selection; check in SQL through a scope if selections get very large.
-        return $this->allowedKeys ??= $this->getHost()->getSelectedQuery()->cursor()
+        return $this->allowedKeys ??= $this->getHost()->eachSelectedRecord()
             ->filter(fn (Model $record): bool => Gate::allows($this->individualAbility, $record))
             ->map(fn (Model $record): mixed => $record->getKey())
             ->values()
@@ -88,7 +99,7 @@ class BulkAction extends Action
         }
 
         return ! $this->getHost()->hasSelection()
-            || $this->getHost()->getSelectedQuery()->cursor()->every(fn (Model $record): bool => Gate::allows($this->authorization, $record));
+            || $this->getHost()->eachSelectedRecord()->every(fn (Model $record): bool => Gate::allows($this->authorization, $record));
     }
 
     /**

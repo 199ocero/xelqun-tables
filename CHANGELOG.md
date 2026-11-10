@@ -2,6 +2,22 @@
 
 Xelqun Tables is alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Upgrading
+
+- **Requires `xelqun/forms` ^0.10** and `@xelqun/forms` ^0.10.0.
+- **`Table::query()` is no longer abstract.** It returns `?Builder`, and `null` by default, for tables of custom data. A table that declares `query(): Builder` works as before. Code that calls `$table->query()` on another table should allow for `null`.
+- `resolveRecords()`, `TableActionHost::getSelectedRecords()` and `BulkAction::getRecords()` are typed `Collection<int, covariant Model>`, because a row can be an `ArrayRecord`.
+
+### Added
+
+- **Tables of custom data**, as in Filament. Call `records()` in `boot()` with a closure that returns rows keyed by a stable key, from an API or anywhere else. It can ask for `$search`, `$columnSearches`, `$filters`, `$sortColumn`, `$sortDirection`, `$page` and `$recordsPerPage`. An array or collection is every row, and the table paginates it. A paginator is one page, as given.
+    - Each row reaches columns and actions as an **`ArrayRecord`**: read it as `$record['title']` or `$record->title`, and get the array back with `toArray()`. It can't be saved or deleted, and a string `authorize()` ability denies unless a gate of that name allows it.
+    - **`resolveSelectedRecordsUsing()`** finds rows again by key for actions. Without it, `records()` runs with no search or filters and all rows on one page. Rows the resolver returns beyond the keys it was asked for are dropped.
+    - Nothing scopes custom rows for you, so `records()` must return only what the viewer may see.
+    - Summaries, counts and sums of related rows, inline editing, the query builder, relationship filters, groups, reordering and cursor pagination need a database query. A table of custom data that uses one fails while the page renders, with a message that names it.
+
 ## 0.7.1 - 2026-11-10
 
 The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.7.1`.

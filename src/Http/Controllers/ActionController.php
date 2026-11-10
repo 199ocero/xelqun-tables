@@ -39,7 +39,7 @@ class ActionController
         $action = $host->findAction($validated['action']);
 
         abort_if($action === null, 404);
-        abort_if($isBulk && ! $host->getSelectedQuery()->exists(), 404);
+        abort_if($isBulk && ! $host->selectionExists(), 404);
         abort_unless($action->canRun(), 403);
 
         if ($validated['phase'] === 'mount') {

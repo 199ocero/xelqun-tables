@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Traits\Macroable;
 use UnitEnum;
 use Xelqun\Forms\Support\SafeUrl;
+use Xelqun\Tables\Columns\Contracts\Editable;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Summarizers\Summarizer;
 use Xelqun\Tables\Table;
@@ -396,6 +397,17 @@ abstract class Column
         $this->isHiddenByDefault = $condition && $isHiddenByDefault;
 
         return $this;
+    }
+
+    /**
+     * Whether this column only works on a database query: a count or sum of
+     * related rows, summaries, or inline editing.
+     *
+     * @internal
+     */
+    public function needsQuery(): bool
+    {
+        return $this->aggregate !== null || $this->summarizers !== [] || $this instanceof Editable;
     }
 
     /**

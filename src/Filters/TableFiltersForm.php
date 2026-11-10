@@ -6,6 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Xelqun\Forms\Form;
+use Xelqun\Tables\ArrayRecord;
 use Xelqun\Tables\Table;
 
 /**
@@ -39,7 +40,7 @@ final class TableFiltersForm extends Form
 
     public function model(): string
     {
-        return $this->getTable()->query()->getModel()::class;
+        return $this->getTable()->usesCustomData() ? ArrayRecord::class : $this->getTable()->getQuery()->getModel()::class;
     }
 
     public function getId(): string

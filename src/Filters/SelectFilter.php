@@ -50,6 +50,11 @@ class SelectFilter extends BaseFilter
     /**
      * Offer the related records, and keep rows that have the chosen ones.
      */
+    public function needsQuery(): bool
+    {
+        return $this->relationship !== null;
+    }
+
     public function relationship(string $name, string $titleAttribute): static
     {
         $this->relationship = $name;
@@ -111,7 +116,7 @@ class SelectFilter extends BaseFilter
         /** @var Table $table */
         $table = $this->table;
 
-        return $table->query()->getModel()->{$this->relationship}()->getRelated()->newQuery()->orderBy($this->titleAttribute);
+        return $table->getQuery()->getModel()->{$this->relationship}()->getRelated()->newQuery()->orderBy($this->titleAttribute);
     }
 
     /**

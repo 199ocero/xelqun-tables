@@ -129,6 +129,17 @@ abstract class BaseFilter
         return $this->name;
     }
 
+    /**
+     * Whether this filter only works on a database query. A table of custom
+     * data gets the filter's values in records() and applies them itself.
+     *
+     * @internal
+     */
+    public function needsQuery(): bool
+    {
+        return false;
+    }
+
     public function getLabel(): string
     {
         return $this->evaluate($this->label) ?? Str::headline($this->name);

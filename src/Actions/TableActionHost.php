@@ -6,11 +6,13 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Enumerable;
 use LogicException;
 use Xelqun\Actions\Action;
 use Xelqun\Actions\ActionGroup;
 use Xelqun\Actions\ActionSet;
 use Xelqun\Forms\Components\Component;
+use Xelqun\Tables\ArrayRecord;
 use Xelqun\Tables\Exceptions\TableDefinitionException;
 use Xelqun\Tables\Table;
 
@@ -37,7 +39,7 @@ final class TableActionHost extends ActionSet
 
     private ?Table $table = null;
 
-    /** @var Collection<int, Model>|null */
+    /** @var Collection<int, covariant Model>|null */
     private ?Collection $selectedRecords = null;
 
     /**
@@ -80,7 +82,7 @@ final class TableActionHost extends ActionSet
      * The selection, found again on every request. It travels in a modal's
      * token, and a row in it may have left the table since.
      *
-     * @return Collection<int, Model>
+     * @return Collection<int, covariant Model>
      */
     public function getSelectedRecords(): Collection
     {
@@ -100,6 +102,33 @@ final class TableActionHost extends ActionSet
     public function hasSelection(): bool
     {
         return ($this->context['selection'] ?? []) !== [];
+    }
+
+    /**
+     * The selection, one record at a time: from the query, so a big selection
+     * isn't loaded at once, or from custom data, which has no query.
+     *
+     * @return Enumerable<int, Model>
+     */
+    public function eachSelectedRecord(): Enumerable
+    {
+        return $this->getTable()->usesCustomData() ? $this->getSelectedRecords() : $this->getSelectedQuery()->cursor();
+    }
+
+    /**
+     * @internal
+     */
+    public function usesCustomData(): bool
+    {
+        return $this->getTable()->usesCustomData();
+    }
+
+    /**
+     * Whether any selected row is still in the table.
+     */
+    public function selectionExists(): bool
+    {
+        return $this->getTable()->usesCustomData() ? $this->getSelectedRecords()->isNotEmpty() : $this->getSelectedQuery()->exists();
     }
 
     /**
@@ -151,7 +180,7 @@ final class TableActionHost extends ActionSet
 
     public function model(): string
     {
-        return $this->getTable()->query()->getModel()::class;
+        return $this->getTable()->usesCustomData() ? ArrayRecord::class : $this->getTable()->getQuery()->getModel()::class;
     }
 
     /**

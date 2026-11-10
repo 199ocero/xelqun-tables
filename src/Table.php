@@ -7,7 +7,10 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Str;
 use Xelqun\Actions\Action;
 use Xelqun\Actions\ActionGroup;
@@ -78,6 +81,10 @@ abstract class Table
 
     private ?Closure $isRecordSelectable = null;
 
+    private ?Closure $records = null;
+
+    private ?Closure $resolveSelectedRecords = null;
+
     private ?string $description = null;
 
     /** @var array<int, Column>|null */
@@ -114,10 +121,70 @@ abstract class Table
 
     /**
      * The records this table can show. Every read and every action stays inside it.
+     * A table of custom data gives records() in boot() instead.
+     *
+     * @return Builder<covariant Model>|null
+     */
+    public function query(): ?Builder
+    {
+        return null;
+    }
+
+    /**
+     * Rows that don't come from Eloquent, such as an API's. Call it in boot().
+     * The closure gets any of $search, $columnSearches, $filters (by filter
+     * name, active ones only), $sortColumn, $sortDirection, $page and
+     * $recordsPerPage (null for all), and returns rows keyed by a unique,
+     * stable key. An array or collection holds every row, and the table
+     * paginates it; a paginator is one page, as given.
+     *
+     * Nothing scopes these rows for you: return only what the viewer may see,
+     * whatever the search, filters or keys say. Each row reaches columns and
+     * actions as an ArrayRecord.
+     */
+    public function records(Closure $records): static
+    {
+        $this->records = $records;
+
+        return $this;
+    }
+
+    /**
+     * How an action finds rows of custom data again, by key: it gets $keys and
+     * returns those rows keyed like records(). Without it, records() runs with
+     * no search or filters and all rows on one page, which suits small data.
+     * Keys come from the browser, so return only rows the viewer may see.
+     */
+    public function resolveSelectedRecordsUsing(?Closure $callback): static
+    {
+        $this->resolveSelectedRecords = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     */
+    public function usesCustomData(): bool
+    {
+        return $this->records !== null;
+    }
+
+    /**
+     * query(), for code that can't work without one.
+     *
+     * @internal
      *
      * @return Builder<covariant Model>
      */
-    abstract public function query(): Builder;
+    public function getQuery(): Builder
+    {
+        return $this->query() ?? throw new TableDefinitionException(
+            $this->usesCustomData()
+                ? 'The table ['.static::class.'] shows custom data, so it has no query. Use $records instead of $query in its actions.'
+                : 'The table ['.static::class.'] needs a query() or records().',
+        );
+    }
 
     /**
      * @return array<int, Column|ColumnGroup>
@@ -176,7 +243,11 @@ abstract class Table
      */
     public function resolveRecord(int|string $key): Model
     {
-        $query = $this->query();
+        if ($this->usesCustomData()) {
+            return $this->resolveCustomRecords([$key])->first() ?? abort(404);
+        }
+
+        $query = $this->getQuery();
 
         // A word compared with an integer column is an error on some databases.
         abort_if($query->getModel()->getKeyType() === 'int' && ! ctype_digit((string) $key), 404);
@@ -237,12 +308,16 @@ abstract class Table
      * because another viewer may have removed that row.
      *
      * @param  array<int, mixed>  $keys
-     * @return Collection<int, Model>
+     * @return Collection<int, covariant Model>
      */
     public function resolveRecords(array $keys): Collection
     {
+        if ($this->usesCustomData()) {
+            return new Collection($this->resolveCustomRecords($keys)->filter(fn (Model $record): bool => $this->isRecordSelectable($record))->values()->all());
+        }
+
         // Nothing selected needs no query.
-        return $keys === [] ? $this->query()->getModel()->newCollection() : $this->queryRecords($keys)->get();
+        return $keys === [] ? $this->getQuery()->getModel()->newCollection() : $this->queryRecords($keys)->get();
     }
 
     /**
@@ -254,7 +329,7 @@ abstract class Table
      */
     public function queryRecords(array $keys): Builder
     {
-        $query = $this->query();
+        $query = $this->getQuery();
         $model = $query->getModel();
         $keys = array_values(array_unique(array_filter(
             $keys,
@@ -263,7 +338,7 @@ abstract class Table
 
         if ($this->isRecordSelectable !== null) {
             // Checked one at a time, because the rule is PHP and not SQL.
-            $keys = $this->query()->whereKey($keys)->cursor()
+            $keys = $this->getQuery()->whereKey($keys)->cursor()
                 ->filter(fn (Model $record): bool => $this->isRecordSelectable($record))
                 ->map(fn (Model $record): mixed => $record->getKey())
                 ->values()
@@ -283,6 +358,13 @@ abstract class Table
      */
     public function getSelectableKeys(TableState $state): ?array
     {
+        if ($this->usesCustomData()) {
+            [$records, , $pagination] = $this->fetchCustomRecords($state->withPage(1), $this->maxSelectableRecords + 1);
+            $keys = $records->filter(fn (Model $record): bool => $this->isRecordSelectable($record))->map(fn (Model $record): string => $record->getKey());
+
+            return $keys->count() > $this->maxSelectableRecords || ($pagination['total'] ?? 0) > $this->maxSelectableRecords ? null : $keys->values()->all();
+        }
+
         $query = $this->buildQuery($state);
         // shortcut: with a selectable rule, select all checks rows one at a time in PHP until it has enough; give the rule a query scope if tables with many unselectable rows get slow.
         $keys = $this->isRecordSelectable === null
@@ -575,7 +657,7 @@ abstract class Table
      */
     public function getReorderQuery(): Builder
     {
-        return $this->query();
+        return $this->getQuery();
     }
 
     public function canReorder(): bool
@@ -700,7 +782,13 @@ abstract class Table
             throw new TableDefinitionException('The table ['.static::class.'] has two columns with the same name. Cells are keyed by name, so one would overwrite the other.');
         }
 
-        $model = $this->query()->getModel();
+        if ($this->usesCustomData()) {
+            $this->assertCustomDataCanShow($columns);
+
+            return $this->mountedColumns = $columns;
+        }
+
+        $model = $this->getQuery()->getModel();
 
         foreach ($columns as $column) {
             $column->assertCanBeQueried($model);
@@ -765,8 +853,9 @@ abstract class Table
     {
         $columns = $this->getColumns();
         $hasRecordActions = $this->recordActions() !== [];
-        $query = $this->buildQuery($state);
-        [$records, $state, $pagination] = $this->paginate($query, $state);
+        [$records, $state, $pagination] = $this->usesCustomData()
+            ? $this->fetchCustomRecords($state, $state->perPage === 0 ? null : $state->perPage)
+            : $this->paginate($this->buildQuery($state), $state);
 
         return [
             'query' => (object) $state->toQuery($this),
@@ -776,7 +865,7 @@ abstract class Table
             'group' => $state->group,
             // Here and not in the first render, so a filter can change which bulk actions make sense.
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
-            'summaries' => $this->getSummaries($state),
+            'summaries' => $this->usesCustomData() ? [] : $this->getSummaries($state),
             'rows' => $records->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
                 ...array_filter([
@@ -944,11 +1033,152 @@ abstract class Table
     }
 
     /**
+     * One page of custom data, the state with the page it really is, and what
+     * the pager shows. Like paginate(), for rows from records(). A null
+     * $perPage asks for every row.
+     *
+     * @return array{0: BaseCollection<int, ArrayRecord>, 1: TableState, 2: array<string, mixed>}
+     */
+    private function fetchCustomRecords(TableState $state, ?int $perPage): array
+    {
+        $sortColumn = $state->sort === null ? null : ltrim($state->sort, '-');
+        $filters = [];
+
+        foreach ($this->getActiveFilters($state) as $filter) {
+            $filters[$filter->getName()] = Arr::only($state->filters, $filter->getFieldNames());
+        }
+
+        $result = app()->call($this->records, [
+            'search' => $state->search === '' ? null : $state->search,
+            'columnSearches' => $state->columnSearches,
+            'filters' => $filters,
+            'sortColumn' => $sortColumn,
+            'sortDirection' => $sortColumn === null ? null : (str_starts_with((string) $state->sort, '-') ? 'desc' : 'asc'),
+            'page' => $state->page,
+            'recordsPerPage' => $perPage,
+        ]);
+        $shared = [
+            'perPage' => $state->perPage === 0 ? 'all' : $state->perPage,
+            'options' => $this->paginationPageOptions,
+            ...($this->isPaginated ? [] : ['hidden' => true]),
+        ];
+
+        if ($result instanceof LengthAwarePaginator) {
+            $total = $result->total();
+            $lastPage = $result->lastPage();
+            $records = $this->toArrayRecords($result->getCollection());
+            $state = $state->withPage($result->currentPage());
+        } elseif ($result instanceof Paginator) {
+            $records = $this->toArrayRecords($result->getCollection());
+
+            return [$records, $state->withPage($result->currentPage()), [...$shared, 'mode' => 'simple', 'page' => $result->currentPage(), 'hasMore' => $result->hasMorePages()]];
+        } else {
+            $all = $this->toArrayRecords($this->toRows($result, 'records()'));
+            $total = $all->count();
+            $lastPage = $perPage === null ? 1 : max((int) ceil($total / $perPage), 1);
+            // Counted first, because removing the last row of the last page leaves the viewer past the end.
+            $state = $state->withPage(min($state->page, $lastPage));
+            $records = $perPage === null ? $all : $all->forPage($state->page, $perPage)->values();
+        }
+
+        return [$records, $state, ['page' => $state->page, 'perPage' => $shared['perPage'], 'total' => $total, 'lastPage' => $lastPage, ...$shared]];
+    }
+
+    /**
+     * @return BaseCollection<array-key, mixed>
+     */
+    private function toRows(mixed $result, string $source): BaseCollection
+    {
+        if ($result instanceof BaseCollection) {
+            return $result;
+        }
+
+        if (! is_array($result)) {
+            throw new TableDefinitionException("{$source} on the table [".static::class.'] has to return an array, a collection or a paginator.');
+        }
+
+        return new BaseCollection($result);
+    }
+
+    /**
+     * @param  BaseCollection<array-key, mixed>  $rows
+     * @return BaseCollection<int, ArrayRecord>
+     */
+    private function toArrayRecords(BaseCollection $rows): BaseCollection
+    {
+        return $rows->map(function (mixed $row, int|string $key): ArrayRecord {
+            if (! is_array($row)) {
+                throw new TableDefinitionException('records() on the table ['.static::class.'] returned a row that is not an array.');
+            }
+
+            return ArrayRecord::fromArray($key, $row);
+        })->values();
+    }
+
+    /**
+     * @param  array<int, mixed>  $keys
+     * @return BaseCollection<int, ArrayRecord>
+     */
+    private function resolveCustomRecords(array $keys): BaseCollection
+    {
+        $keys = array_values(array_unique(array_map(strval(...), array_filter($keys, is_scalar(...)))));
+
+        if ($keys === []) {
+            return new BaseCollection;
+        }
+
+        if ($this->resolveSelectedRecords !== null) {
+            $rows = $this->toRows(app()->call($this->resolveSelectedRecords, ['keys' => $keys]), 'resolveSelectedRecordsUsing()');
+        } else {
+            // Not through TableState, which would fill in each filter's default and hide rows outside it.
+            $rows = $this->toRows(app()->call($this->records, [
+                'search' => null,
+                'columnSearches' => [],
+                'filters' => [],
+                'sortColumn' => null,
+                'sortDirection' => null,
+                'page' => 1,
+                'recordsPerPage' => null,
+            ]), 'records()');
+        }
+
+        // Only the keys asked for, whatever the resolver gave back.
+        return $this->toArrayRecords($rows->only($keys));
+    }
+
+    /**
+     * Fail while the page renders, for what only a database query can do.
+     *
+     * @param  array<int, Column>  $columns
+     */
+    private function assertCustomDataCanShow(array $columns): void
+    {
+        $unsupported = array_filter([
+            'a query()' => $this->query() !== null,
+            'groups' => $this->groups !== [] || $this->groupColumn !== null,
+            'reordering' => $this->reorderColumn !== null,
+            'cursor pagination' => $this->paginationMode === 'cursor',
+            ...array_map(fn (Column $column): bool => $column->needsQuery(), array_combine(
+                array_map(fn (Column $column): string => "the column [{$column->getName()}]", $columns),
+                $columns,
+            )),
+            ...array_map(fn (BaseFilter $filter): bool => $filter->needsQuery(), array_combine(
+                array_map(fn (BaseFilter $filter): string => "the filter [{$filter->getName()}]", $this->getFilters()),
+                $this->getFilters(),
+            )),
+        ]);
+
+        if ($unsupported !== []) {
+            throw new TableDefinitionException('The table ['.static::class.'] shows custom data from records(), which can\'t have '.implode(', ', array_keys($unsupported)).'. Summaries, counts, inline editing, the query builder and relationship filters need a database query.');
+        }
+    }
+
+    /**
      * @return Builder<covariant Model>
      */
     private function buildQuery(TableState $state): Builder
     {
-        $query = $this->query();
+        $query = $this->getQuery();
         $model = $query->getModel();
 
         $query->with(array_values(array_filter(
