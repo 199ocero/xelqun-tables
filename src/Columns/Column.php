@@ -443,9 +443,9 @@ abstract class Column
 
             return [
                 'label' => $summarizer->getLabel(),
-                'value' => is_array($value)
+                'value' => ! $summarizer->formatsLikeColumn() ? $value : (is_array($value)
                     ? implode(' – ', array_map(fn (mixed $part): string => (string) $this->formatValue($part, $model), $value))
-                    : $this->formatValue($value, $model),
+                    : $this->formatValue($value, $model)),
             ];
         }, $this->summarizers, array_keys($this->summarizers));
     }

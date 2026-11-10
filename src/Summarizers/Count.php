@@ -11,6 +11,11 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class Count extends Summarizer
 {
+    public function formatsLikeColumn(): bool
+    {
+        return false;
+    }
+
     public function summarize(Builder $query, string $column): mixed
     {
         return $query->whereNotNull($column)->count();

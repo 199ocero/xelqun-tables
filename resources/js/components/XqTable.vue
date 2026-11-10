@@ -720,6 +720,7 @@ onMounted(() => {
                             <XqTableSummaryRow
                                 v-if="groupSummary(index)"
                                 data-xq-table-group-summary
+                                class="bg-xq-muted/40"
                                 :summaries="groupSummary(index)!"
                                 :columns="columns"
                                 :column-class="columnClass"

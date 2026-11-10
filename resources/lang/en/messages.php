@@ -14,6 +14,8 @@ return [
         'value' => 'Value',
         'match_any' => 'Match any rule, not all',
         'group' => 'Group of rules',
+        'rule' => 'Rule',
+        'add_rule' => 'Add rule',
         'rules' => 'Rules',
     ],
 

@@ -29,6 +29,17 @@ abstract class Summarizer
         return $this;
     }
 
+    /**
+     * Whether the value is shown the way the column shows its cells, as money
+     * or a date. A count is a number of rows, so it isn't.
+     *
+     * @internal
+     */
+    public function formatsLikeColumn(): bool
+    {
+        return true;
+    }
+
     public function getLabel(): ?string
     {
         return $this->label;

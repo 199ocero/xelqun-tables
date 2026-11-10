@@ -204,6 +204,15 @@ describe('summaries', function () {
         ]);
     });
 
+    it('shows a count as a plain number on a money column', function () {
+        EditableTable::$columns = [TextColumn::make('price')->money('USD')->summarize([Sum::make(), Count::make()])];
+
+        expect(summaries()['price'])->toEqual([
+            ['label' => null, 'value' => '$40.00'],
+            ['label' => null, 'value' => 2],
+        ]);
+    });
+
     it('works out a column\'s summaries in one query, and still runs a summarizer of its own', function () {
         EditableTable::$columns = [TextColumn::make('price')->summarize([Sum::make(), Average::make(), Count::make(), Range::make(), new class extends Summarizer
         {

@@ -86,6 +86,8 @@ class QueryBuilder extends BaseFilter
 
         return Repeater::make($name)
             ->defaultItems(0)
+            ->itemLabel(__('xelqun-tables::messages.query_builder.rule'))
+            ->addActionLabel(__('xelqun-tables::messages.query_builder.add_rule'))
             ->columns(2)
             ->schema([
                 Select::make('constraint')

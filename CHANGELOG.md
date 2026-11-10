@@ -2,6 +2,14 @@
 
 Xelqun Tables is alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
+## Unreleased
+
+### Fixed
+
+- **A `Count` summary is a plain number**, not formatted like its column. On a money column it said `$300.00` where it meant 300 rows.
+- The query builder calls its rows "Rule" and its button "Add rule", instead of "Item" and "Add item".
+- A group's summary line has a light background, so it reads apart from the line for all rows.
+
 ## 0.8.0 - 2026-11-10
 
 The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.8.0`.

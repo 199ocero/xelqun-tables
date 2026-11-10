@@ -527,8 +527,8 @@
                                 },
                                 "minItems": 0,
                                 "maxItems": null,
-                                "addLabel": "Add item",
-                                "itemLabel": "Item",
+                                "addLabel": "Add rule",
+                                "itemLabel": "Rule",
                                 "orderable": true,
                                 "columns": {
                                     "default": 1,
@@ -556,8 +556,8 @@
                     },
                     "minItems": 0,
                     "maxItems": null,
-                    "addLabel": "Add item",
-                    "itemLabel": "Item",
+                    "addLabel": "Add rule",
+                    "itemLabel": "Rule",
                     "orderable": true,
                     "columns": {
                         "default": 1,
