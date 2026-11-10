@@ -1,4 +1,5 @@
-import { HttpError, notify, postJson, reportRequestFailure, translate } from '@xelqun/forms';
+import { notify, translate } from '@xelqun/forms';
+import { HttpError, postJson, reportRequestFailure } from '@xelqun/forms/internal';
 import type {
     ActionModal,
     ActionResult,
