@@ -2,7 +2,9 @@
 
 Xelqun Tables is alpha. Until 1.0, a minor version can break existing code, and each break is listed here.
 
-## Unreleased
+## 0.8.0 - 2026-11-10
+
+The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.8.0`.
 
 ### Upgrading
 
