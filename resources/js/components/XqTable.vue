@@ -17,7 +17,7 @@ import { createTableStore } from '../core/store';
 import { TABLE_TRANSLATOR } from '../core/translator';
 import { isSameQuery, readQuery, writeQuery } from '../core/url';
 import { SUPPORTED_SCHEMA_VERSIONS } from '../schema/types';
-import type { TableColumn, TableQuery, TableSchema } from '../schema/types';
+import type { TableColumn, TableQuery, TableSchema, TableSummaries } from '../schema/types';
 import { actionNode } from './actionNode';
 import { builtInCells } from './cells';
 import XqTableBulkBar from './XqTableBulkBar.vue';
@@ -27,6 +27,7 @@ import XqTableFilters from './XqTableFilters.vue';
 import XqTablePagination from './XqTablePagination.vue';
 import XqTableRow from './XqTableRow.vue';
 import XqTableScrollbar from './XqTableScrollbar.vue';
+import XqTableSummaryRow from './XqTableSummaryRow.vue';
 import XqTableSearch from './XqTableSearch.vue';
 
 const props = defineProps<{
@@ -236,6 +237,16 @@ function startsGroup(index: number): boolean {
     const row = schema.value.rows[index];
 
     return row.group !== undefined && row.group !== schema.value.rows[index - 1]?.group;
+}
+
+/** A group's summary, under its last row on this page. */
+function groupSummary(index: number): TableSummaries | undefined {
+    const row = schema.value.rows[index];
+    const isLast = row.groupKey !== schema.value.rows[index + 1]?.groupKey;
+
+    return row.groupKey === undefined || !isLast
+        ? undefined
+        : schema.value.groupSummaries?.[row.groupKey];
 }
 
 /** The very first and last rows can't move further, wherever the page is. */
@@ -706,6 +717,16 @@ onMounted(() => {
                                 :can-move-down="canMove(index, 'down')"
                                 :title-id="`xq-${schema.id}-${row.key}`"
                             />
+                            <XqTableSummaryRow
+                                v-if="groupSummary(index)"
+                                data-xq-table-group-summary
+                                :summaries="groupSummary(index)!"
+                                :columns="columns"
+                                :column-class="columnClass"
+                                :reorderable="schema.layout.reorderable"
+                                :has-selection="hasSelection"
+                                :has-row-actions="hasRowActions"
+                            />
                         </template>
                         <tr v-if="schema.rows.length === 0">
                             <td
@@ -717,31 +738,14 @@ onMounted(() => {
                         </tr>
                     </tbody>
                     <tfoot v-if="Object.keys(schema.summaries).length > 0" data-xq-table-summary>
-                        <tr class="border-xq-border border-t">
-                            <td v-if="schema.layout.reorderable"></td>
-                            <td v-if="hasSelection"></td>
-                            <td
-                                v-for="column in columns"
-                                :key="column.name"
-                                :class="
-                                    cn(
-                                        'px-3 py-2 text-sm font-medium align-top',
-                                        columnClass(column),
-                                    )
-                                "
-                            >
-                                <p
-                                    v-for="(line, position) in schema.summaries[column.name]"
-                                    :key="position"
-                                >
-                                    <span v-if="line.label" class="text-xq-muted-foreground">
-                                        {{ line.label }}:
-                                    </span>
-                                    {{ line.value }}
-                                </p>
-                            </td>
-                            <td v-if="hasRowActions"></td>
-                        </tr>
+                        <XqTableSummaryRow
+                            :summaries="schema.summaries"
+                            :columns="columns"
+                            :column-class="columnClass"
+                            :reorderable="schema.layout.reorderable"
+                            :has-selection="hasSelection"
+                            :has-row-actions="hasRowActions"
+                        />
                     </tfoot>
                 </table>
             </div>

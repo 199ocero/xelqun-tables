@@ -39,6 +39,9 @@ use Xelqun\Tables\State\TableState;
  */
 abstract class Table
 {
+    /** The most groups on one page that each get a summary. */
+    private const int MAX_SUMMARIZED_GROUPS = 50;
+
     private ?string $groupColumn = null;
 
     /** @var array<string, Group> By column. */
@@ -856,6 +859,8 @@ abstract class Table
         [$records, $state, $pagination] = $this->usesCustomData()
             ? $this->fetchCustomRecords($state, $state->perPage === 0 ? null : $state->perPage)
             : $this->paginate($this->buildQuery($state), $state);
+        $summaries = $this->usesCustomData() ? [] : $this->getSummaries($state);
+        $groupSummaries = $summaries === [] ? [] : $this->getGroupSummaries($state, $records);
 
         return [
             'query' => (object) $state->toQuery($this),
@@ -865,9 +870,11 @@ abstract class Table
             'group' => $state->group,
             // Here and not in the first render, so a filter can change which bulk actions make sense.
             'bulkActions' => TableActionHost::for($this, TableActionHost::BULK)->toActionNodes(),
-            'summaries' => $this->usesCustomData() ? [] : $this->getSummaries($state),
+            'summaries' => $summaries,
+            ...($groupSummaries === [] ? [] : ['groupSummaries' => (object) $groupSummaries]),
             'rows' => $records->map(fn (Model $record): array => [
                 'key' => (string) $record->getKey(),
+                ...($groupSummaries === [] ? [] : ['groupKey' => $this->getGroupKey($record, (string) $state->group)]),
                 ...array_filter([
                     'url' => SafeUrl::filter($this->recordUrl($record)),
                     'group' => $this->getRowGroup($record, $state->group),
@@ -962,6 +969,57 @@ abstract class Table
         }
 
         return $summaries;
+    }
+
+    /**
+     * The summaries of each group on this page, by the group's raw value, so
+     * a value two groups format alike still keeps them apart.
+     *
+     * @param  BaseCollection<int, Model>  $records
+     * @return array<string, array<string, array<int, array{label: string|null, value: mixed}>>>
+     */
+    private function getGroupSummaries(TableState $state, BaseCollection $records): array
+    {
+        $group = $state->group;
+
+        // shortcut: a group through a relation, such as category.name, gets no summary of its own; join the relation in the scope below if one needs it.
+        if ($group === null || str_contains($group, '.')) {
+            return [];
+        }
+
+        $values = $records->mapWithKeys(fn (Model $record): array => [$this->getGroupKey($record, $group) => $record->getRawOriginal($group)]);
+
+        // shortcut: one summary query for each group and summarized column, so past this many groups on a page (as "all" can put there) none get a summary; switch to one GROUP BY query per column if more are needed.
+        if ($values->count() > self::MAX_SUMMARIZED_GROUPS) {
+            return [];
+        }
+
+        $summaries = [];
+
+        foreach ($values as $key => $value) {
+            // A global scope, like the filters, so an orWhere in query() can't get around it.
+            $query = $this->buildQuery($state)->withGlobalScope('xelqun-group-summary', fn (Builder $scoped): Builder => $value === null
+                ? $scoped->whereNull($scoped->qualifyColumn($group))
+                : $scoped->where($scoped->qualifyColumn($group), $value));
+
+            foreach ($this->getColumns() as $column) {
+                $lines = $column->toSummaries($query);
+
+                if ($lines !== []) {
+                    $summaries[$key][$column->getName()] = $lines;
+                }
+            }
+        }
+
+        return $summaries;
+    }
+
+    /**
+     * The raw value as JSON, so null, false, 0 and "" stay different groups.
+     */
+    private function getGroupKey(Model $record, string $group): string
+    {
+        return (string) json_encode($record->getRawOriginal($group));
     }
 
     /**

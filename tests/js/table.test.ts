@@ -1179,6 +1179,43 @@ describe('editable cells and grouped rows', () => {
         ]);
         expect(wrapper.find('[data-xq-table-summary]').text()).toMatch(/Count:\s+3/);
     });
+
+    it("puts each group's summary under its last row", () => {
+        const wrapper = mount(XqTable, {
+            props: {
+                table: schema({
+                    columns: [
+                        {
+                            name: 'name',
+                            type: 'text-column',
+                            label: 'Name',
+                            sortable: false,
+                            props: {},
+                        },
+                    ],
+                    summaries: { name: [{ label: 'Count', value: 3 }] },
+                    groupSummaries: {
+                        red: { name: [{ label: 'Count', value: 2 }] },
+                        blue: { name: [{ label: 'Count', value: 1 }] },
+                    },
+                    rows: ['red', 'red', 'blue'].map((group, index) => ({
+                        key: String(index),
+                        group: group.toUpperCase(),
+                        groupKey: group,
+                        cells: { name: { state: `row ${index}` } },
+                        actions: [],
+                    })),
+                }),
+            },
+            global: { plugins: [createXelqunForms()] },
+        });
+
+        const lines = wrapper
+            .findAll('tbody tr')
+            .map((row) => row.text().replace(/\s+/g, ' ').trim());
+
+        expect(lines).toEqual(['RED', 'row 0', 'row 1', 'Count: 2', 'BLUE', 'row 2', 'Count: 1']);
+    });
 });
 
 describe('editing and polling', () => {

@@ -36,11 +36,16 @@ export interface TableAction {
     actions?: TableAction[];
 }
 
+/** Lines under each column, by column name. */
+export type TableSummaries = Record<string, Array<{ label: string | null; value: unknown }>>;
+
 export interface TableRow {
     key: string;
     url?: string;
     /** The heading this row sits under, on a grouped table. */
     group?: string;
+    /** The group's raw value, which keys groupSummaries. Sent only with them. */
+    groupKey?: string;
     /** False for a row that can't be selected for bulk actions. */
     selectable?: boolean;
     /** The name of the record action a click on the row opens. */
@@ -80,7 +85,9 @@ export interface TableResult {
     group?: string | null;
     /** A chip for each active filter, with the fields that removing it clears. */
     indicators?: Array<{ label: string; fields: string[] }>;
-    summaries: Record<string, Array<{ label: string | null; value: unknown }>>;
+    summaries: TableSummaries;
+    /** Each group's summaries on this page, by the rows' groupKey. */
+    groupSummaries?: Record<string, TableSummaries>;
     bulkActions: TableAction[];
     rows: TableRow[];
     pagination: TablePagination;
