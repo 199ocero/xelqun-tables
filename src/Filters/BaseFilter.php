@@ -80,6 +80,15 @@ abstract class BaseFilter
         return $this;
     }
 
+    public function visible(bool|Closure $condition = true): static
+    {
+        $this->hidden = $condition instanceof Closure
+            ? fn (): bool => ! $this->evaluate($condition)
+            : ! $condition;
+
+        return $this;
+    }
+
     /**
      * The value before the viewer changes anything.
      */

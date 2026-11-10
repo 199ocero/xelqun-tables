@@ -40,7 +40,7 @@ class FilteredTable extends Table
     public function filters(): array
     {
         return [
-            SelectFilter::make('status')->options(['draft' => 'Draft', 'active' => 'Active'])->hidden(fn (): bool => ! self::$showsStatus),
+            SelectFilter::make('status')->options(['draft' => 'Draft', 'active' => 'Active'])->visible(fn (): bool => self::$showsStatus),
             SelectFilter::make('kinds')->attribute('status')->multiple()->options(['draft' => 'Draft', 'active' => 'Active']),
             SelectFilter::make('category')->relationship('category', 'name'),
             TernaryFilter::make('is_featured'),
