@@ -1,6 +1,6 @@
 {
     "$xq": 1,
-    "pkg": "0.8.2",
+    "pkg": "0.9.0",
     "id": "summaries-table",
     "endpoints": {
         "query": "\/_xelqun\/tables\/query",
