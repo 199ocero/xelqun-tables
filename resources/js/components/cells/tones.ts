@@ -8,7 +8,7 @@ export const textTones: Record<string, string> = {
 };
 
 export const badgeTones: Record<string, string> = {
-    gray: 'border-transparent bg-xq-muted text-xq-muted-foreground',
+    gray: 'border-transparent bg-xq-secondary text-xq-secondary-foreground',
     primary: 'border-transparent bg-xq-primary/15 text-xq-primary',
     success: 'border-transparent bg-xq-success/15 text-xq-success',
     warning: 'border-transparent bg-xq-warning/15 text-xq-warning',

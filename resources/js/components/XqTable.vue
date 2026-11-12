@@ -472,7 +472,7 @@ onMounted(() => {
             <span
                 v-for="(indicator, index) in schema.indicators"
                 :key="index"
-                class="gap-1 pl-2.5 pr-1 py-0.5 text-xs border-xq-border bg-xq-muted inline-flex items-center rounded-full border"
+                class="gap-1 pl-2.5 pr-1 py-0.5 text-xs bg-xq-secondary text-xq-secondary-foreground inline-flex items-center rounded-(--xq-pill-radius) border border-transparent"
             >
                 {{ indicator.label }}
                 <button

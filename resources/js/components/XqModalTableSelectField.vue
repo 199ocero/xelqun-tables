@@ -63,7 +63,7 @@ function remove(key: string): void {
             <span
                 v-for="key in values"
                 :key="key"
-                class="gap-1 pl-2.5 pr-1 py-0.5 text-sm border-xq-border bg-xq-muted inline-flex items-center rounded-full border"
+                class="gap-1 pl-2.5 pr-1 py-0.5 text-sm bg-xq-secondary text-xq-secondary-foreground inline-flex items-center rounded-(--xq-pill-radius) border border-transparent"
             >
                 {{ labels.get(key) ?? key }}
                 <button

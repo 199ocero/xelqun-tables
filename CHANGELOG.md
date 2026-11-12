@@ -2,6 +2,12 @@
 
 Xelqun Tables is beta. Until 1.0, a patch release never breaks existing code except to fix a security issue, and a minor release can, with each break listed here under "Upgrading". See [version support](https://xelqun.com/introduction/version-support).
 
+## Unreleased
+
+### Changed
+
+- Gray badges, filter chips and the chips of a modal table select use the secondary tint, so they follow `--xq-color-secondary`, and their corners follow `--xq-pill-radius`, as does the columns button. The columns button is 40px, to line up with the 40px buttons in forms.
+
 ## 0.8.2 - 2026-11-12
 
 The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.8.2`.

@@ -13,7 +13,7 @@ defineEmits<{ toggle: [name: string, isVisible: boolean] }>();
             <button
                 type="button"
                 :aria-label="t('Columns')"
-                class="size-9 border-xq-input hover:bg-xq-accent focus-visible:ring-xq-ring inline-flex cursor-pointer items-center justify-center rounded-full border focus-visible:ring-2 focus-visible:outline-none"
+                class="size-10 border-xq-input hover:bg-xq-accent focus-visible:ring-xq-ring inline-flex cursor-pointer items-center justify-center rounded-(--xq-pill-radius) border focus-visible:ring-2 focus-visible:outline-none"
                 data-xq-table-columns
             >
                 <Columns3 class="size-4" aria-hidden="true" />
