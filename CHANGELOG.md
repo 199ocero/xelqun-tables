@@ -2,7 +2,9 @@
 
 Xelqun Tables is beta. Until 1.0, a patch release never breaks existing code except to fix a security issue, and a minor release can, with each break listed here under "Upgrading". See [version support](https://xelqun.com/introduction/version-support).
 
-## Unreleased
+## 0.8.2 - 2026-11-12
+
+The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.8.2`.
 
 ### Fixed
 
