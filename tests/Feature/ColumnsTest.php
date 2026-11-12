@@ -183,6 +183,20 @@ it('builds an image url from a disk', function () {
     expect(cellOf(ImageColumn::make('secret')->disk('public'), $product)['state'])->toContain('photos/a.png');
 });
 
+it('finds a plain path on the disk FileUpload saves to, with no disk given', function () {
+    Storage::fake('public');
+    Storage::fake('s3');
+
+    $product = Product::create(['name' => 'A', 'secret' => 'cover-x.png']);
+
+    expect(cellOf(ImageColumn::make('secret'), $product)['state'])->toBe(Storage::disk('public')->url('cover-x.png'));
+
+    config(['xelqun-forms.uploads.disk' => 's3']);
+
+    expect(cellOf(ImageColumn::make('secret'), $product)['state'])->toBe(Storage::disk('s3')->url('cover-x.png'))
+        ->and(cellOf(ImageColumn::make('secret'), Product::create(['name' => 'B', 'secret' => '/images/b.png']))['state'])->toBe('/images/b.png');
+});
+
 it('uses a stored url as it is, and drops one it can\'t trust', function () {
     expect(cellOf(ImageColumn::make('secret'), Product::create(['name' => 'A', 'secret' => 'https://cdn.example/a.png']))['state'])->toBe('https://cdn.example/a.png')
         ->and(cellOf(ImageColumn::make('secret'), Product::create(['name' => 'B', 'secret' => 'javascript:alert(1)']))['state'])->toBeNull()

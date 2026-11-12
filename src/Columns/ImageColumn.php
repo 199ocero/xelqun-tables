@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Storage;
 use Xelqun\Forms\Support\SafeUrl;
 
 /**
- * The state is a URL, or a path on the disk given to disk().
+ * The state is a URL, or a path on the disk given to disk(). Without one, a
+ * plain path is on the disk FileUpload saves to by default.
  *
  * @api
  */
@@ -74,6 +75,9 @@ class ImageColumn extends Column
             return null;
         }
 
-        return SafeUrl::filter($this->disk === null ? $value : Storage::disk($this->disk)->url($value));
+        // A plain path with no disk is where FileUpload put it, so it's on the same default disk.
+        $disk = $this->disk ?? (preg_match('#\A(?:[a-z][a-z0-9+.-]*:|/)#i', $value) === 1 ? null : (string) config('xelqun-forms.uploads.disk', 'public'));
+
+        return SafeUrl::filter($disk === null ? $value : Storage::disk($disk)->url($value));
     }
 }

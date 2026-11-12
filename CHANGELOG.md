@@ -2,6 +2,12 @@
 
 Xelqun Tables is beta. Until 1.0, a patch release never breaks existing code except to fix a security issue, and a minor release can, with each break listed here under "Upgrading". See [version support](https://xelqun.com/introduction/version-support).
 
+## Unreleased
+
+### Fixed
+
+- **An `ImageColumn` or `ImageEntry` without `disk()` showed nothing for a file `FileUpload` saved.** It read the stored path as a URL and dropped it. A plain path is now on the disk `FileUpload` saves to by default (`xelqun-forms.uploads.disk`, which is `public`), and a URL is still used as it is.
+
 ## 0.8.1 - 2026-11-10
 
 The schema version (`$xq`) stays 1. Update both halves together: `composer update xelqun/tables` and `npm install @xelqun/tables@0.8.1`.
