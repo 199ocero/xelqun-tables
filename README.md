@@ -10,7 +10,7 @@
 
 Describe a table in PHP and generic Vue components render it. Normal tables need no Vue at all.
 
-> **Alpha:** the API will change. Requires Laravel 13, Inertia 3, Vue 3.5, Tailwind 4 and [`xelqun/forms`](https://github.com/199ocero/xelqun-forms).
+> **Beta:** a patch release never breaks your code, and a minor release lists every break in the [changelog](CHANGELOG.md). Requires Laravel 13, Inertia 3, Vue 3.5, Tailwind 4 and [`xelqun/forms`](https://github.com/199ocero/xelqun-forms).
 
 ## Installation
 
